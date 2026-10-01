@@ -79,10 +79,19 @@ nav button{font-size:.68rem;padding-left:0;padding-right:0;letter-spacing:0}
 header{position:relative}
 #gear{position:absolute;top:0;right:0;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--bd);color:var(--fg);display:flex;align-items:center;justify-content:center}
 #gear svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
-h1{padding-right:52px}
+h1{padding-right:0;margin-right:52px}
+.hi{margin-right:52px}
 #a-goals .x{display:none}
 #a-today .chips{flex-wrap:wrap;overflow:visible}
 #a-today .chip{white-space:normal;text-align:left;flex:1 1 100%}
+@media (prefers-color-scheme:light){:root[data-theme="auto"]{--bg:#f3f5f7;--fg:#14181d;--mut:#5d6873;--card:#fff;--bd:#dce1e6;--del:#c62828;--acct:color-mix(in srgb,var(--acc) 58%,#000);color-scheme:light}}
+:root{--acct:var(--acc)}
+:root[data-theme="light"]{--bg:#f3f5f7;--fg:#14181d;--mut:#5d6873;--card:#fff;--bd:#dce1e6;--del:#c62828;--acct:color-mix(in srgb,var(--acc) 58%,#000);color-scheme:light}
+.hi,.ok,nav button.on{color:var(--acct)}
+.pill{color:var(--acct);border-color:var(--acct)}
+nav{background:var(--card)}
+.sws{flex-wrap:wrap}
+#u-th .chip{flex:1}
 </style>
 </head>
 <body>
@@ -99,12 +108,13 @@ h1{padding-right:52px}
   <div id="s-today"></div>
   <div id="s-chips" class="chips"></div>
   <div class="card">
-    <div id="f-bank"><label for="s-bank">Liste d'exercices</label><select id="s-bank" style="margin-bottom:8px"></select><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice dans ton planning, il sera gardé dans « Mes exercices ».</p></div>
+    <div id="f-bank"><label for="s-bank">Liste d'exercices</label><select id="s-bank" style="margin-bottom:8px"></select><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice ci-dessous, puis ajoute-le à ta liste.</p><button id="s-addex" class="sec" style="margin-bottom:12px">Ajouter l'exercice saisi à ma liste</button></div>
     <div class="row"><div><label for="s-d">Date</label><input id="s-d" type="date"></div>
     <div id="f-force"><label for="s-e">Exercice</label><input id="s-e" list="exos" placeholder="Squat" autocomplete="off"></div></div>
     <div class="row" id="f-force2"><div><label for="s-n">Séries</label><input id="s-n" type="number" inputmode="numeric" min="1" placeholder="3"></div>
     <div><label for="s-r">Reps</label><input id="s-r" type="number" inputmode="numeric" min="1"></div>
     <div><label for="s-w">Poids (kg)</label><input id="s-w" type="number" inputmode="decimal" step="0.5" min="0"></div></div>
+    <p class="mut" id="f-hint" hidden style="margin:0 0 8px">Distance ou durée : l'une des deux suffit.</p>
     <div class="row" id="f-cardio" hidden><div><label for="c-km">Distance (km)</label><input id="c-km" type="number" inputmode="decimal" step="0.01" min="0"></div>
     <div><label for="c-min">Durée (min)</label><input id="c-min" type="number" inputmode="decimal" step="0.5" min="0"></div></div>
     <button id="s-add">Enregistrer</button>
@@ -166,6 +176,7 @@ h1{padding-right:52px}
   <div class="card">
     <label for="u-n">Ton prénom</label><input id="u-n" autocomplete="off" placeholder="Prénom" style="margin-bottom:14px">
     <label>Couleur</label><div class="sws" id="u-c"></div>
+    <label style="margin-top:16px">Thème</label><div id="u-th" class="chips" style="margin:0"></div>
   </div>
   <div class="card">
     <p class="mut">Tes données restent uniquement dans le navigateur de ce téléphone. Personne d'autre n'y a accès, y compris le créateur de l'appli.</p>
@@ -192,7 +203,7 @@ h1{padding-right:52px}
 
 <script>
 const K='suivi-sport-v1';
-const DEF=()=>({sets:[],body:[],runs:[],plan:{},chk:{},goals:[],custom:[],food:[],ng:{kcal:2000,p:100,g:250,l:70}});let S=DEF();
+const DEF=()=>({sets:[],body:[],runs:[],plan:{},chk:{},goals:[],custom:[],myex:[],food:[],ng:{kcal:2000,p:100,g:250,l:70}});let S=DEF();
 try{const r=localStorage.getItem(K);if(r){const p=JSON.parse(r);if(Array.isArray(p.sets)&&Array.isArray(p.body)){S=Object.assign(DEF(),p)}}}catch(e){}
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){alert("Enregistrement impossible dans ce navigateur.")}};
 const $=id=>document.getElementById(id);
@@ -204,7 +215,7 @@ const fmtL=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 const LAB={bw:['Poids corporel','kg'],ventre:['Ventre','cm'],poitrine:['Poitrine','cm'],hanches:['Hanches','cm'],bras:['Bras','cm'],cuisse:['Cuisse','cm']};
 
-const COLORS=['#29b6ff','#39ff88','#ff7a1a','#a5c8ff','#ffc09a'];
+const COLORS=['#29b6ff','#39ff88','#ff7a1a','#ff5fa8','#1de9c6','#b794ff','#ffd84d','#a5c8ff','#ffc09a'],CN=['Bleu','Vert','Orange','Rose','Turquoise','Violet','Jaune','Bleu pastel','Orange pastel'];
 let P={};try{P=JSON.parse(localStorage.getItem('suivi-sport-prefs')||'{}')}catch(e){}
 const saveP=()=>{try{localStorage.setItem('suivi-sport-prefs',JSON.stringify(P))}catch(e){}};
 let curEx='',curM='bw',curSp='force';
@@ -222,18 +233,19 @@ function chart(pts,f){
   const X=i=>p+(t1==t0?0:(t[i]-t0)/(t1-t0))*(W-p-14),Y=v=>H-26-(v-lo)/(hi-lo)*(H-56),n=pts.length-1;
   const d=pts.map((q,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(q.y).toFixed(1)).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Courbe d'évolution"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--acc);stop-opacity:.22"/><stop offset="1" style="stop-color:var(--acc);stop-opacity:0"/></linearGradient></defs>`+
-    `<path d="${d}L${X(n).toFixed(1)} ${H-26}L${X(0).toFixed(1)} ${H-26}Z" fill="url(#g)"/><path d="${d}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`+
-    `<circle cx="${X(n).toFixed(1)}" cy="${Y(pts[n].y).toFixed(1)}" r="5" fill="var(--acc)" stroke="var(--card)" stroke-width="2"/>`+
+    `<path d="${d}L${X(n).toFixed(1)} ${H-26}L${X(0).toFixed(1)} ${H-26}Z" fill="url(#g)"/><path d="${d}" fill="none" stroke="var(--acct)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`+
+    `<circle cx="${X(n).toFixed(1)}" cy="${Y(pts[n].y).toFixed(1)}" r="5" fill="var(--acct)" stroke="var(--card)" stroke-width="2"/>`+
     `<text x="2" y="${Y(hi)+4}" font-size="10" fill="var(--mut)">${F(hi)}</text><text x="2" y="${Y(lo)+4}" font-size="10" fill="var(--mut)">${F(lo)}</text>`+
     `<text x="${p}" y="${H-6}" font-size="10" fill="var(--mut)">${fmt(pts[0].x)}</text><text x="${W-14}" y="${H-6}" font-size="10" text-anchor="end" fill="var(--mut)">${fmt(pts[n].x)}</text></svg>`;
 }
 function renderSeances(){
   $('s-chips').innerHTML=chips(Object.entries(SP),curSp,'sp');renderToday();renderBank();
-  $('f-force').hidden=$('f-force2').hidden=curSp!=='force';$('f-cardio').hidden=curSp==='force';
+  $('f-force').hidden=$('f-force2').hidden=curSp!=='force';$('f-cardio').hidden=$('f-hint').hidden=curSp==='force';
   $('exos').innerHTML=allEx().map(n=>`<option value="${esc(n)}">`).join('');
   const days={},add=(d,h)=>(days[d]=days[d]||[]).push(h),x=id=>`<button class="x ed" data-edit-${id[0]}="${id[1]}" aria-label="Modifier">✎</button><button class="x" data-del-${id[0]}="${id[1]}" aria-label="Supprimer">×</button>`;
   S.sets.forEach(s=>add(s.d,`<div class="li"><span><b>${esc(s.ex)}</b><br><span class="mut">${s.n||1} séries × ${s.r}</span></span><span class="v">${s.w} kg${x(['set',s.id])}</span></div>`));
-  S.runs.forEach(r=>add(r.d,`<div class="li"><span><b>${SP[r.type]}</b><br><span class="mut">${fn(r.min)} min · ${r.type==='course'?fp(r.min/r.km)+' /km':fn(r.km/(r.min/60))+' km/h'}</span></span><span class="v">${fn(r.km)} km${x(['run',r.id])}</span></div>`));
+  S.runs.forEach(r=>{const both=r.km>0&&r.min>0,sub=[r.min>0?fn(r.min)+' min':'',both?(r.type==='course'?fp(r.min/r.km)+' /km':fn(r.km/(r.min/60))+' km/h'):''].filter(Boolean).join(' · ');
+    add(r.d,`<div class="li"><span><b>${SP[r.type]}</b>${sub?`<br><span class="mut">${sub}</span>`:''}</span><span class="v">${r.km>0?fn(r.km)+' km':fn(r.min)+' min'}${x(['run',r.id])}</span></div>`)});
   const ds=Object.keys(days).sort().reverse();
   $('s-list').innerHTML=ds.length?ds.map(d=>`<div class="day">${fmtL(d)}</div><div class="card">${days[d].join('')}</div>`).join(''):'<p class="mut">Aucune séance pour l\'instant. Enregistre la première ci-dessus.</p>';
 }
@@ -242,15 +254,17 @@ function renderProgres(){
   if(S.runs.some(r=>r.type==='course'))opts.push(['@course','Course']);
   if(S.runs.some(r=>r.type==='marche'))opts.push(['@marche','Marche']);
   if(!opts.some(o=>o[0]===curEx))curEx=opts[0]?opts[0][0]:'';
-  $('p-chips').innerHTML=opts.length?'<select id="p-sel" aria-label="Exercice ou sport" style="margin-bottom:8px">'+opts.map(([v,l])=>`<option value="${esc(v)}"${v===curEx?' selected':''}>${esc(l)}</option>`).join('')+'</select>'+(curEx[0]!=='@'?'<select id="p-met" aria-label="Donnée à afficher">'+MET.map(m=>`<option value="${m[0]}"${m[0]===curMet?' selected':''}>${m[1]}</option>`).join('')+'</select>':''):'';
+  $('p-chips').innerHTML=opts.length?selH('p-sel','Exercice ou sport',opts,curEx,'margin-bottom:8px')+(curEx[0]!=='@'?selH('p-met','Donnée à afficher',MET.map(m=>[m[0],m[1]]),curMet):selH('p-cm','Donnée à afficher',[['d','Distance'],['t','Durée'],['p',curEx==='@course'?'Allure':'Vitesse']],curCm)):'';
   if(!opts.length){$('p-out').innerHTML='<p class="mut">Enregistre des séances pour voir ta progression.</p>';return}
   if(curEx[0]==='@'){
-    const t=curEx.slice(1),c=t==='course',rs=S.runs.filter(r=>r.type===t),val=r=>c?r.min/r.km:r.km/(r.min/60),f=c?fp:v=>v.toFixed(1).replace('.',',');
-    const by={};rs.forEach(r=>{const v=val(r);by[r.d]=by[r.d]==null?v:(c?Math.min(by[r.d],v):Math.max(by[r.d],v))});
-    const pts=Object.keys(by).sort().map(d=>({x:d,y:by[d]})),ys=pts.map(q=>q.y),best=c?Math.min(...ys):Math.max(...ys);
-    $('p-out').innerHTML=`<div class="card"><span class="mut">${c?'Meilleure allure':'Meilleure vitesse'}</span><div class="big">${f(best)} <small>${c?'min/km':'km/h'}</small></div>
-    <div class="stats"><div><span class="mut">Sorties</span><b>${rs.length}</b></div><div><span class="mut">Total</span><b>${fn(rs.reduce((a,r)=>a+r.km,0))} km</b></div><div><span class="mut">Plus longue</span><b>${fn(Math.max(...rs.map(r=>r.km)))} km</b></div></div></div>
-    <div class="card"><h2>${c?'Allure':'Vitesse'} par jour</h2>${chart(pts,f)}</div>`;
+    const t=curEx.slice(1),c=t==='course',rs=S.runs.filter(r=>r.type===t);
+    const CM=[['d','Distance','km'],['t','Durée','min'],['p',c?'Allure':'Vitesse',c?'min/km':'km/h']],cm=CM.find(x=>x[0]===curCm)||CM[0],pc=cm[0]==='p'&&c;
+    const val=r=>cm[0]==='d'?r.km:cm[0]==='t'?r.min:(r.km>0&&r.min>0?(c?r.min/r.km:r.km/(r.min/60)):null),bt=(a,v)=>pc?Math.min(a,v):Math.max(a,v);
+    const by={};rs.forEach(r=>{const v=val(r);if(v>0)by[r.d]=by[r.d]==null?v:bt(by[r.d],v)});
+    const pts=Object.keys(by).sort().map(d=>({x:d,y:by[d]})),f=pc?fp:v=>String(+v.toFixed(1)).replace('.',','),ys=pts.map(q=>q.y),kms=rs.filter(r=>r.km>0).map(r=>r.km);
+    $('p-out').innerHTML=`<div class="card"><span class="mut">${cm[0]==='p'?(c?'Meilleure allure':'Meilleure vitesse'):'Record : '+cm[1].toLowerCase()}</span><div class="big">${pts.length?f(pc?Math.min(...ys):Math.max(...ys)):'—'} <small>${cm[2]}</small></div>
+    <div class="stats"><div><span class="mut">Sorties</span><b>${rs.length}</b></div><div><span class="mut">Total</span><b>${kms.length?fn(kms.reduce((a,b)=>a+b,0))+' km':'—'}</b></div><div><span class="mut">Plus longue</span><b>${kms.length?fn(Math.max(...kms))+' km':'—'}</b></div></div></div>
+    <div class="card"><h2>${cm[1]} par jour</h2>${pts.length?chart(pts,f):'<p class="mut">Pas de donnée pour cette mesure'+(cm[0]==='p'?' (il faut la distance et la durée).':'.')+'</p>'}</div>`;
     return;
   }
   const rows=S.sets.filter(s=>s.ex===curEx),by={};
@@ -267,11 +281,11 @@ function renderCorps(){
   $('b-list').innerHTML=rows.length?'<div class="card">'+rows.map(b=>`<div class="li"><span><b>${fmtL(b.d)}</b><br><span class="mut">${Object.keys(LAB).filter(k=>b[k]!=null).map(k=>LAB[k][0]+' '+b[k]+' '+LAB[k][1]).join(', ')}</span></span><span class="v"><button class="x ed" data-edit-body="${b.id}" aria-label="Modifier">✎</button><button class="x" data-del-body="${b.id}" aria-label="Supprimer">×</button></span></div>`).join('')+'</div>':'';
 }
 function applyP(){
-  document.documentElement.style.setProperty('--acc',P.c||COLORS[0]);
+  document.documentElement.style.setProperty('--acc',P.c||COLORS[0]);document.documentElement.dataset.theme=P.th||'dark';$('u-th').innerHTML=chips([['dark','Sombre'],['light','Clair'],['auto','Automatique']],P.th||'dark','th');document.querySelector('meta[name=theme-color]').content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   setTitle();
   const wk=new Set([...S.sets,...S.runs].filter(s=>s.d>=ago(6)).map(s=>s.d)).size;
   $('wk').textContent=wk+(wk>1?' jours d\'entraînement':' jour d\'entraînement')+' sur les 7 derniers jours';
-  $('u-c').innerHTML=COLORS.map(c=>`<button class="sw${c===(P.c||COLORS[0])?' on':''}" style="background:${c}" data-c="${c}" aria-label="Couleur ${c}"></button>`).join('');
+  $('u-c').innerHTML=COLORS.map((c,i)=>`<button class="sw${c===(P.c||COLORS[0])?' on':''}" style="background:${c}" data-c="${c}" aria-label="${CN[i]||c}"></button>`).join('');
 }
 const renderAll=()=>{syncLab();renderExtra();renderSeances();renderPlan();renderGoals();renderProgres();renderCorps();renderNut();applyP();renderBk()};
 
@@ -280,11 +294,11 @@ $('s-add').onclick=()=>{
   if(curSp==='force'){
     const ex=$('s-e').value.trim(),w=num($('s-w').value),r=num($('s-r').value);
     if(!d||!ex||w==null||w<0||!r||r<1){alert("Renseigne la date, l'exercice, le poids et les répétitions.");return}
-    upsert(S.sets,{id:ED.s||uid(),d,ex,w,r:Math.round(r),n:Math.max(1,Math.round(num($('s-n').value)||1))});$('s-w').value='';$('s-r').value='';$('s-n').value='';
+    addMyEx(ex);upsert(S.sets,{id:ED.s||uid(),d,ex,w,r:Math.round(r),n:Math.max(1,Math.round(num($('s-n').value)||1))});$('s-w').value='';$('s-r').value='';$('s-n').value='';
   }else{
-    const km=num($('c-km').value),mn=num($('c-min').value);
-    if(!d||!km||km<=0||!mn||mn<=0){alert('Renseigne la date, la distance et la durée.');return}
-    upsert(S.runs,{id:ED.s||uid(),d,type:curSp,km,min:mn});$('c-km').value='';$('c-min').value='';
+    const km=num($('c-km').value),mn=num($('c-min').value),okk=km>0,okm=mn>0;
+    if(!d||(!okk&&!okm)){alert("Renseigne la distance ou la durée (l'une des deux suffit).");return}
+    const o={id:ED.s||uid(),d,type:curSp};if(okk)o.km=km;if(okm)o.min=mn;upsert(S.runs,o);$('c-km').value='';$('c-min').value='';
   }
   setEd('s',null);save();renderAll();
 };
@@ -327,13 +341,15 @@ $('d-imp').onclick=()=>{
 const BANK={'Pectoraux':['Développé couché','Développé incliné haltères','Pompes','Écartés poulie','Dips'],'Dos':['Tractions','Rowing barre','Tirage vertical','Tirage horizontal','Soulevé de terre'],'Jambes':['Squat','Presse à cuisses','Fentes','Leg extension','Leg curl','Hip thrust','Mollets debout'],'Épaules':['Développé militaire','Élévations latérales','Oiseau','Face pull'],'Bras':['Curl barre','Curl marteau','Extension triceps poulie','Barre au front'],'Abdos':['Crunch','Gainage','Relevé de jambes']};
 const BK=Object.values(BANK).flat(),DAYS=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 let curG='';
-const allEx=()=>[...new Set([...BK,...names()])].sort((a,b)=>a.localeCompare(b,'fr'));
+const customEx=()=>[...new Set([...S.myex,...names(),...Object.values(S.plan).flatMap(p=>p.ex.map(x=>x.n))])].filter(n=>!BK.includes(n)).sort((a,b)=>a.localeCompare(b,'fr'));
+const addMyEx=n=>{n=(n||'').trim();if(n&&!BK.includes(n)&&!S.myex.includes(n))S.myex.push(n)};
+const allEx=()=>[...new Set([...BK,...customEx()])].sort((a,b)=>a.localeCompare(b,'fr'));
 const wd=()=>(new Date().getDay()+6)%7;
 const syncLab=()=>{Object.keys(LAB).forEach(k=>{if(k[0]==='x')delete LAB[k]});S.custom.forEach(c=>LAB[c.k]=[c.n,'cm'])};
 function renderExtra(){$('b-extra').innerHTML=S.custom.map(c=>`<div class="row"><div><label for="b-${c.k}">${esc(c.n)} (cm)</label><input id="b-${c.k}" type="number" inputmode="decimal" step="0.5" min="0"></div></div>`).join('')}
 function renderBank(){
   $('f-bank').hidden=curSp!=='force';
-  const m=names().filter(n=>!BK.includes(n)),cur=$('s-e').value.trim();
+  const m=customEx(),cur=$('s-e').value.trim();
   const og=(l,a)=>`<optgroup label="${esc(l)}">`+a.map(n=>`<option${n===cur?' selected':''}>${esc(n)}</option>`).join('')+'</optgroup>';
   $('s-bank').innerHTML='<option value="">Choisir dans la liste…</option>'+Object.keys(BANK).map(g=>og(g,BANK[g])).join('')+(m.length?og('Mes exercices',m):'');
 }
@@ -347,7 +363,7 @@ function renderToday(){
 const TECH=['À l\'échec','Dégressif','Pyramidal','Superset','Rest-pause'];
 function renderPlanEdit(){
   $('pl-out').innerHTML='<p class="mut">Définis ta semaine type. Le jour même, la séance prévue apparaît dans l\'accueil et dans l\'onglet Séances.</p>'+DAYS.map((D,i)=>{const p=S.plan[i]||{name:'',ex:[]};
-    return `<div class="card"><h2>${D}</h2><input data-plname="${i}" value="${esc(p.name)}" placeholder="Nom de la séance (ex. Jambes) si vide = Repos" aria-label="Nom de la séance ${D}" style="margin-bottom:8px">`+
+    return `<div class="card"><h2>${D}</h2><input data-plname="${i}" value="${esc(p.name)}" placeholder="Repos ou nom de la séance (ex. Jambes)" aria-label="Nom de la séance ${D}" style="margin-bottom:8px">`+
     p.ex.map((x,j)=>`<div class="li"><span>${esc(x.n)}${x.t?`<br><span class="mut">${esc(x.t)}</span>`:''}</span><span class="v">${x.s} séries<button class="x" data-pl-del="${i}-${j}" aria-label="Retirer">×</button></span></div>`).join('')+
     `<div class="row" style="margin:10px 0 0"><input id="pl-e-${i}" list="exos" placeholder="Exercice" aria-label="Exercice ${D}"><input id="pl-s-${i}" type="number" inputmode="numeric" min="1" value="3" style="flex:0 0 64px" aria-label="Séries"></div>`+
     `<div class="row" style="margin:8px 0 0"><select id="pl-t-${i}" aria-label="Technique ${D}"><option value="">Technique : standard</option>${TECH.map(t=>`<option>${esc(t)}</option>`).join('')}</select><button data-pl-add="${i}" style="flex:0 0 52px" aria-label="Ajouter">+</button></div></div>`}).join('');
@@ -355,13 +371,14 @@ function renderPlanEdit(){
 const gp=k=>[k.split(':')[0],k.slice(k.indexOf(':')+1)];
 function gcur(g){const[t,k]=gp(g.k);
   if(t==='ex'){const a=S.sets.filter(s=>s.ex===k).map(s=>s.w);return a.length?Math.max(...a):null}
-  if(t==='run'){const a=S.runs.filter(r=>r.type===k).map(r=>r.km);return a.length?Math.max(...a):null}
+  if(t==='run'){const a=S.runs.filter(r=>r.type===k&&r.km>0).map(r=>r.km);return a.length?Math.max(...a):null}
+  if(t==='runt'){const a=S.runs.filter(r=>r.type===k&&r.min>0).map(r=>r.min);return a.length?Math.max(...a):null}
   const a=S.body.filter(b=>b[k]!=null).sort((x,y)=>x.d.localeCompare(y.d));return a.length?a[a.length-1][k]:null}
-const gu=g=>{const[t,k]=gp(g.k);return t==='ex'?'kg':t==='run'?'km':(LAB[k]||['','cm'])[1]};
-const gn=g=>{const[t,k]=gp(g.k);return t==='ex'?k+' (charge max)':t==='run'?SP[k]+' (distance)':(LAB[k]||[k])[0]};
+const gu=g=>{const[t,k]=gp(g.k);return t==='ex'?'kg':t==='run'?'km':t==='runt'?'min':(LAB[k]||['','cm'])[1]};
+const gn=g=>{const[t,k]=gp(g.k);return t==='ex'?k+' (charge max)':t==='run'?SP[k]+' (distance)':t==='runt'?SP[k]+' (durée)':(LAB[k]||[k])[0]};
 function renderGoals(){
   const cur=$('g-k').value;
-  $('g-k').innerHTML='<optgroup label="Musculation">'+allEx().map(n=>`<option value="ex:${esc(n)}">${esc(n)} (charge max)</option>`).join('')+'</optgroup><optgroup label="Course et marche"><option value="run:course">Course (distance)</option><option value="run:marche">Marche (distance)</option></optgroup><optgroup label="Corps">'+Object.keys(LAB).map(k=>`<option value="body:${k}">${esc(LAB[k][0])}</option>`).join('')+'</optgroup>';
+  $('g-k').innerHTML='<optgroup label="Musculation">'+allEx().map(n=>`<option value="ex:${esc(n)}">${esc(n)} (charge max)</option>`).join('')+'</optgroup><optgroup label="Course et marche"><option value="run:course">Course (distance)</option><option value="run:marche">Marche (distance)</option><option value="runt:course">Course (durée)</option><option value="runt:marche">Marche (durée)</option></optgroup><optgroup label="Corps">'+Object.keys(LAB).map(k=>`<option value="body:${k}">${esc(LAB[k][0])}</option>`).join('')+'</optgroup>';
   if(cur)$('g-k').value=cur;
   let ch=false;
   $('g-list').innerHTML=S.goals.length?S.goals.map(g=>{
@@ -373,7 +390,7 @@ function renderGoals(){
     const msg=g.done?(g.done<=g.by?'Objectif atteint avant la date. Félicitations !':'Objectif atteint, même après la date prévue. Félicitations !'):
       left<0?`Date dépassée${r!=null?', il manque '+r+' '+u:''}. Ce n'est pas un échec : fixe une nouvelle date et continue, chaque séance compte.`:
       c==null?'Pas encore de donnée pour cet objectif.':`Encore ${r} ${u}, ${left} jour${left>1?'s':''} restant${left>1?'s':''}. Continue.`;
-    return `<div class="goal"><div class="li" style="border:0;padding:0"><b>${esc(gn(g))} : ${g.t} ${u}</b><button class="x" data-gdel="${g.id}" aria-label="Supprimer l'objectif">×</button></div><div class="mut">Avant le ${fmtL(g.by)}${c!=null?' · actuel '+c+' '+u:''}</div><div class="bar"><i style="width:${Math.round(pc*100)}%"></i></div><p class="mut" style="margin:6px 0 0;${g.done?'color:var(--acc)':''}">${msg}</p></div>`}).join(''):'<p class="mut">Aucun objectif pour l\'instant.</p>';
+    return `<div class="goal"><div class="li" style="border:0;padding:0"><b>${esc(gn(g))} : ${g.t} ${u}</b><button class="x" data-gdel="${g.id}" aria-label="Supprimer l'objectif">×</button></div><div class="mut">Avant le ${fmtL(g.by)}${c!=null?' · actuel '+c+' '+u:''}</div><div class="bar"><i style="width:${Math.round(pc*100)}%"></i></div><p class="mut" style="margin:6px 0 0;${g.done?'color:var(--acct)':''}">${msg}</p></div>`}).join(''):'<p class="mut">Aucun objectif pour l\'instant.</p>';
   $('a-goals').innerHTML=$('g-list').innerHTML;if(ch)save();
 }
 const MAC=[['kcal','Calories','kcal'],['p','Protéines','g'],['g','Glucides','g'],['l','Lipides','g']];
@@ -406,7 +423,7 @@ document.addEventListener('click',e=>{
     else if(c.dataset.xe!==undefined){$('s-e').value=c.dataset.xe;renderBank();$('s-n').focus()}
     else{const x=S.plan[wd()].ex[+c.dataset.tp];curSp='force';$('s-e').value=x.n;$('s-n').value=x.s;renderSeances();go('seances');$('s-w').focus()}
   }
-  if(a.plAdd!==undefined){const i=a.plAdd,n=$('pl-e-'+i).value.trim(),sr=Math.round(num($('pl-s-'+i).value))||3;if(!n)return;(S.plan[i]=S.plan[i]||{name:'',ex:[]}).ex.push(Object.assign({n,s:sr},$('pl-t-'+i).value?{t:$('pl-t-'+i).value}:{}));save();renderPlan();renderSeances()}
+  if(a.plAdd!==undefined){const i=a.plAdd,n=$('pl-e-'+i).value.trim(),sr=Math.round(num($('pl-s-'+i).value))||3;if(!n)return;addMyEx(n);(S.plan[i]=S.plan[i]||{name:'',ex:[]}).ex.push(Object.assign({n,s:sr},$('pl-t-'+i).value?{t:$('pl-t-'+i).value}:{}));save();renderPlan();renderSeances()}
   if(a.plDel){const[i,j]=a.plDel.split('-');S.plan[i].ex.splice(+j,1);save();renderPlan();renderSeances()}
   if(a.gdel&&confirm('Supprimer cet objectif ?')){S.goals=S.goals.filter(g=>g.id!==a.gdel);save();renderGoals()}
   if(a.fdel){S.food=S.food.filter(f=>f.id!==a.fdel);save();renderNut()}
@@ -424,7 +441,7 @@ document.addEventListener('click',e=>{
   if(a.editSet||a.editRun){
     const r=a.editSet?S.sets.find(x=>x.id===a.editSet):S.runs.find(x=>x.id===a.editRun);
     curSp=a.editSet?'force':r.type;renderSeances();$('s-d').value=r.d;
-    if(a.editSet){$('s-e').value=r.ex;$('s-n').value=r.n||1;$('s-r').value=r.r;$('s-w').value=r.w}else{$('c-km').value=r.km;$('c-min').value=r.min}
+    if(a.editSet){$('s-e').value=r.ex;$('s-n').value=r.n||1;$('s-r').value=r.r;$('s-w').value=r.w}else{$('c-km').value=r.km??'';$('c-min').value=r.min??''}
     setEd('s',r.id);renderBank();window.scrollTo(0,0);
   }
   if(a.editBody){const r=S.body.find(x=>x.id===a.editBody);$('b-d').value=r.d;Object.keys(LAB).forEach(k=>$('b-'+k).value=r[k]!=null?r[k]:'');setEd('b',r.id);window.scrollTo(0,0)}
@@ -482,7 +499,7 @@ $('bk-go').onclick=backup;$('d-share').onclick=backup;
 $('d-file').onclick=()=>$('d-fin').click();
 $('d-fin').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('d-txt').value=r.result;$('d-imp').click()};r.readAsText(f);e.target.value=''};
 $('s-bank').onchange=e=>{if(e.target.value){$('s-e').value=e.target.value;renderBank();$('s-n').focus()}};
-document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps()}});
+document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='p-cm'){curCm=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps()}});
 const MET=[['w','Charge max','kg'],['r','Répétitions (max sur une série)','reps'],['n','Séries (total du jour)','séries'],['v','Volume (séries × reps × kg)','kg']];let curMet='w';
 const TT={accueil:'',seances:'Séances',planning:'Planning',progres:'Progrès',corps:'Corps',nutrition:'Nutrition',donnees:'Réglages'};
 let curT='accueil';
@@ -491,7 +508,11 @@ function go(t){curT=t;document.querySelectorAll('nav button,section').forEach(x=
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
 $('gear').onclick=()=>go('donnees');
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});
-const APP_V='2026-10-01-d';
+let curCm='d';
+const selH=(id,lab,arr,cur,st)=>`<select id="${id}" aria-label="${lab}"${st?` style="${st}"`:''}>`+arr.map(([v,l])=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(l)}</option>`).join('')+'</select>';
+$('s-addex').onclick=()=>{const n=$('s-e').value.trim();if(!n){alert("Écris d'abord le nom de l'exercice dans le champ Exercice.");return}if(BK.includes(n)||customEx().includes(n)){alert('Cet exercice est déjà dans la liste.');return}addMyEx(n);save();renderAll()};
+document.addEventListener('click',e=>{const c=e.target.closest('[data-th]');if(c){P.th=c.dataset.th;saveP();applyP()}});
+const APP_V='2026-10-01-e';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
