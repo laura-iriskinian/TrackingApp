@@ -65,6 +65,13 @@ button.x{min-width:40px;min-height:40px;padding:0 8px}
 .chk.on{background:var(--acc);border-color:var(--acc)}
 .ok{color:var(--acc)}.ko{color:var(--del)}.todo{color:var(--mut)}
 button:disabled{opacity:.35}
+html{-webkit-text-size-adjust:100%}
+input,select,textarea,button{-webkit-appearance:none;appearance:none;margin:0;min-width:0;max-width:100%}
+input[type=date]{display:block;min-height:46px;line-height:1.2}
+input::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+select{padding-right:34px;background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%237d8590' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center/12px 8px}
+.li>*{min-width:0}.li b{overflow-wrap:anywhere}.v{flex-shrink:0}
+h1{font-size:clamp(1.9rem,9.5vw,2.6rem);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -103,7 +110,7 @@ button:disabled{opacity:.35}
   <div class="card">
     <div class="row"><div><label for="b-d">Date</label><input id="b-d" type="date"></div>
     <div><label for="b-bw">Poids (kg)</label><input id="b-bw" type="number" inputmode="decimal" step="0.1" min="0"></div></div>
-    <div class="row"><div><label for="b-taille">Tour de taille (cm)</label><input id="b-taille" type="number" inputmode="decimal" step="0.5" min="0"></div>
+    <div class="row"><div><label for="b-ventre">Ventre (cm)</label><input id="b-ventre" type="number" inputmode="decimal" step="0.5" min="0"></div>
     <div><label for="b-poitrine">Poitrine (cm)</label><input id="b-poitrine" type="number" inputmode="decimal" step="0.5" min="0"></div></div>
     <div class="row"><div><label for="b-hanches">Hanches (cm)</label><input id="b-hanches" type="number" inputmode="decimal" step="0.5" min="0"></div>
     <div><label for="b-bras">Bras (cm)</label><input id="b-bras" type="number" inputmode="decimal" step="0.5" min="0"></div>
@@ -178,7 +185,7 @@ const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOStr
 const fmt=d=>d.slice(8)+'/'+d.slice(5,7);
 const fmtL=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
-const LAB={bw:['Poids corporel','kg'],taille:['Tour de taille','cm'],poitrine:['Poitrine','cm'],hanches:['Hanches','cm'],bras:['Bras','cm'],cuisse:['Cuisse','cm']};
+const LAB={bw:['Poids corporel','kg'],ventre:['Ventre','cm'],poitrine:['Poitrine','cm'],hanches:['Hanches','cm'],bras:['Bras','cm'],cuisse:['Cuisse','cm']};
 
 const COLORS=['#29b6ff','#39ff88','#ff7a1a','#a5c8ff','#ffc09a'];
 let P={};try{P=JSON.parse(localStorage.getItem('suivi-sport-prefs')||'{}')}catch(e){}
