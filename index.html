@@ -72,17 +72,22 @@ input::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
 select{padding-right:34px;background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%237d8590' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center/12px 8px}
 .li>*{min-width:0}.li b{overflow-wrap:anywhere}.v{flex-shrink:0}
 h1{font-size:clamp(1.9rem,9.5vw,2.6rem);overflow-wrap:anywhere}
+#s-chips .chip{font-size:.9rem;letter-spacing:0;padding:10px 2px}
+nav button{font-size:.68rem;padding-left:0;padding-right:0;letter-spacing:0}
+#s-today .chips{flex-wrap:wrap;overflow:visible}
+#s-today .chip{white-space:normal;text-align:left;flex:1 1 100%}
 </style>
 </head>
 <body>
 <header><p class="hi" id="hi"></p><h1>Ton suivi sport</h1><p class="mut" id="wk"></p></header>
+<div id="up" class="card" hidden style="border-color:var(--acc)"><p style="margin:0 0 10px">Une nouvelle version de l'appli est disponible.</p><button id="up-go">Mettre à jour</button></div>
 <div id="bk" class="card" hidden style="border-color:var(--acc)"><p id="bk-t" style="margin:0 0 10px"></p><button id="bk-go">Sauvegarder maintenant</button></div>
 
 <section id="t-seances" class="on">
   <div id="s-today"></div>
   <div id="s-chips" class="chips"></div>
   <div class="card">
-    <div id="f-bank"><div id="s-grp" class="chips"></div><div id="s-bank" class="chips"></div><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice, il sera gardé dans « Mes exercices ».</p></div>
+    <div id="f-bank"><label for="s-bank">Liste d'exercices</label><select id="s-bank" style="margin-bottom:8px"></select><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice, il sera gardé dans « Mes exercices ».</p></div>
     <div class="row"><div><label for="s-d">Date</label><input id="s-d" type="date"></div>
     <div id="f-force"><label for="s-e">Exercice</label><input id="s-e" list="exos" placeholder="Squat" autocomplete="off"></div></div>
     <div class="row" id="f-force2"><div><label for="s-n">Séries</label><input id="s-n" type="number" inputmode="numeric" min="1" placeholder="3"></div>
@@ -102,7 +107,7 @@ h1{font-size:clamp(1.9rem,9.5vw,2.6rem);overflow-wrap:anywhere}
     <label for="g-k">Nouvel objectif</label><select id="g-k" style="margin-bottom:10px"></select>
     <div class="row"><div><label for="g-v">Valeur cible</label><input id="g-v" type="number" inputmode="decimal" step="0.1"></div><div><label for="g-d">Avant le</label><input id="g-d" type="date"></div></div>
     <button id="g-add">Ajouter l'objectif</button></div>
-  <div id="p-chips" class="chips"></div>
+  <div id="p-chips" style="margin-bottom:12px"></div>
   <div id="p-out"></div>
 </section>
 
@@ -225,7 +230,7 @@ function renderProgres(){
   if(S.runs.some(r=>r.type==='course'))opts.push(['@course','Course']);
   if(S.runs.some(r=>r.type==='marche'))opts.push(['@marche','Marche']);
   if(!opts.some(o=>o[0]===curEx))curEx=opts[0]?opts[0][0]:'';
-  $('p-chips').innerHTML=chips(opts,curEx,'ex');
+  $('p-chips').innerHTML=opts.length?'<select id="p-sel" aria-label="Exercice ou sport">'+opts.map(([v,l])=>`<option value="${esc(v)}"${v===curEx?' selected':''}>${esc(l)}</option>`).join('')+'</select>':'';
   if(!opts.length){$('p-out').innerHTML='<p class="mut">Enregistre des séances pour voir ta progression.</p>';return}
   if(curEx[0]==='@'){
     const t=curEx.slice(1),c=t==='course',rs=S.runs.filter(r=>r.type===t),val=r=>c?r.min/r.km:r.km/(r.min/60),f=c?fp:v=>v.toFixed(1).replace('.',',');
@@ -318,10 +323,9 @@ const syncLab=()=>{Object.keys(LAB).forEach(k=>{if(k[0]==='x')delete LAB[k]});S.
 function renderExtra(){$('b-extra').innerHTML=S.custom.map(c=>`<div class="row"><div><label for="b-${c.k}">${esc(c.n)} (cm)</label><input id="b-${c.k}" type="number" inputmode="decimal" step="0.5" min="0"></div></div>`).join('')}
 function renderBank(){
   $('f-bank').hidden=curSp!=='force';
-  const m=names().filter(n=>!BK.includes(n)),gs=Object.keys(BANK).concat(m.length?['Mes exercices']:[]);
-  if(!gs.includes(curG))curG=gs[0];
-  $('s-grp').innerHTML=chips(gs.map(g=>[g,g]),curG,'g');
-  $('s-bank').innerHTML=chips((curG==='Mes exercices'?m:BANK[curG]).map(n=>[n,n]),$('s-e').value.trim(),'xe');
+  const m=names().filter(n=>!BK.includes(n)),cur=$('s-e').value.trim();
+  const og=(l,a)=>`<optgroup label="${esc(l)}">`+a.map(n=>`<option${n===cur?' selected':''}>${esc(n)}</option>`).join('')+'</optgroup>';
+  $('s-bank').innerHTML='<option value="">Choisir dans la liste…</option>'+Object.keys(BANK).map(g=>og(g,BANK[g])).join('')+(m.length?og('Mes exercices',m):'');
 }
 function renderToday(){
   const p=S.plan[wd()],el=$('s-today');
@@ -464,6 +468,26 @@ async function backup(){
 $('bk-go').onclick=backup;$('d-share').onclick=backup;
 $('d-file').onclick=()=>$('d-fin').click();
 $('d-fin').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('d-txt').value=r.result;$('d-imp').click()};r.readAsText(f);e.target.value=''};
+$('s-bank').onchange=e=>{if(e.target.value){$('s-e').value=e.target.value;renderBank();$('s-n').focus()}};
+document.addEventListener('change',e=>{if(e.target.id==='p-sel'){curEx=e.target.value;renderProgres()}});
+const APP_V='2026-10-01-c';
+let dirty=false,lastChk=0;
+document.addEventListener('input',()=>{dirty=true},true);
+async function checkUpdate(){
+  if(Date.now()-lastChk<30000)return;lastChk=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?c='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const m=(await r.text()).match(new RegExp("APP_V='"+"([^']+)'"));
+    if(!m||m[1]===APP_V)return;
+    const k='upd-'+m[1];
+    if(!dirty&&!sessionStorage.getItem(k)){sessionStorage.setItem(k,'1');location.replace(location.pathname+'?v='+m[1]);return}
+    $('up').hidden=false;
+  }catch(e){}
+}
+$('up-go').onclick=()=>location.replace(location.pathname+'?v='+Date.now());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+window.addEventListener('pageshow',checkUpdate);
+checkUpdate();
 $('n-d').value=today();$('s-d').value=today();$('b-d').value=today();$('u-n').value=P.n||'';renderAll();
 </script>
 </body>
