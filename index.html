@@ -76,18 +76,30 @@ h1{font-size:clamp(1.9rem,9.5vw,2.6rem);overflow-wrap:anywhere}
 nav button{font-size:.68rem;padding-left:0;padding-right:0;letter-spacing:0}
 #s-today .chips{flex-wrap:wrap;overflow:visible}
 #s-today .chip{white-space:normal;text-align:left;flex:1 1 100%}
+header{position:relative}
+#gear{position:absolute;top:0;right:0;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--bd);color:var(--fg);display:flex;align-items:center;justify-content:center}
+#gear svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+h1{padding-right:52px}
+#a-goals .x{display:none}
+#a-today .chips{flex-wrap:wrap;overflow:visible}
+#a-today .chip{white-space:normal;text-align:left;flex:1 1 100%}
 </style>
 </head>
 <body>
-<header><p class="hi" id="hi"></p><h1>Ton suivi sport</h1><p class="mut" id="wk"></p></header>
+<header><p class="hi">Suivi sport</p><h1 id="ttl"></h1><p class="mut" id="wk"></p><button id="gear" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></button></header>
 <div id="up" class="card" hidden style="border-color:var(--acc)"><p style="margin:0 0 10px">Une nouvelle version de l'appli est disponible.</p><button id="up-go">Mettre à jour</button></div>
 <div id="bk" class="card" hidden style="border-color:var(--acc)"><p id="bk-t" style="margin:0 0 10px"></p><button id="bk-go">Sauvegarder maintenant</button></div>
 
-<section id="t-seances" class="on">
+<section id="t-accueil" class="on">
+  <div class="card"><h2>Objectifs</h2><div id="a-goals"></div><button class="sec" data-go="progres" style="margin-top:10px">Gérer les objectifs</button></div>
+  <div id="a-today"></div>
+</section>
+
+<section id="t-seances">
   <div id="s-today"></div>
   <div id="s-chips" class="chips"></div>
   <div class="card">
-    <div id="f-bank"><label for="s-bank">Liste d'exercices</label><select id="s-bank" style="margin-bottom:8px"></select><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice, il sera gardé dans « Mes exercices ».</p></div>
+    <div id="f-bank"><label for="s-bank">Liste d'exercices</label><select id="s-bank" style="margin-bottom:8px"></select><p class="mut" style="margin:0 0 12px">Exercice absent de la liste ? Écris son nom dans le champ Exercice dans ton planning, il sera gardé dans « Mes exercices ».</p></div>
     <div class="row"><div><label for="s-d">Date</label><input id="s-d" type="date"></div>
     <div id="f-force"><label for="s-e">Exercice</label><input id="s-e" list="exos" placeholder="Squat" autocomplete="off"></div></div>
     <div class="row" id="f-force2"><div><label for="s-n">Séries</label><input id="s-n" type="number" inputmode="numeric" min="1" placeholder="3"></div>
@@ -124,7 +136,7 @@ nav button{font-size:.68rem;padding-left:0;padding-right:0;letter-spacing:0}
     <button id="b-add">Enregistrer les mesures</button>
     <button id="b-cancel" class="sec" hidden style="margin-top:8px">Annuler la modification</button>
   </div>
-  <div id="b-chips" class="chips"></div>
+  <div id="b-chips" style="margin-bottom:12px"></div>
   <div id="b-out"></div>
   <div id="b-list"></div>
 </section>
@@ -170,12 +182,12 @@ nav button{font-size:.68rem;padding-left:0;padding-right:0;letter-spacing:0}
 </section>
 
 <nav>
-  <button data-t="seances" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span>Séances</span></button>
+  <button data-t="accueil" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7M6 10v10h12V10"/></svg><span>Accueil</span></button>
+  <button data-t="seances"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span>Séances</span></button>
   <button data-t="planning"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>Planning</span></button>
   <button data-t="progres"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><span>Progrès</span></button>
   <button data-t="corps"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M6 21v-3a6 6 0 0 1 12 0v3"/></svg><span>Corps</span></button>
   <button data-t="nutrition"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M11 3v8M7 7h4M9 11v10M17 3c-2 2-2 6 0 8v10"/></svg><span>Nutrition</span></button>
-  <button data-t="donnees"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>Réglages</span></button>
 </nav>
 
 <script>
@@ -230,7 +242,7 @@ function renderProgres(){
   if(S.runs.some(r=>r.type==='course'))opts.push(['@course','Course']);
   if(S.runs.some(r=>r.type==='marche'))opts.push(['@marche','Marche']);
   if(!opts.some(o=>o[0]===curEx))curEx=opts[0]?opts[0][0]:'';
-  $('p-chips').innerHTML=opts.length?'<select id="p-sel" aria-label="Exercice ou sport">'+opts.map(([v,l])=>`<option value="${esc(v)}"${v===curEx?' selected':''}>${esc(l)}</option>`).join('')+'</select>':'';
+  $('p-chips').innerHTML=opts.length?'<select id="p-sel" aria-label="Exercice ou sport" style="margin-bottom:8px">'+opts.map(([v,l])=>`<option value="${esc(v)}"${v===curEx?' selected':''}>${esc(l)}</option>`).join('')+'</select>'+(curEx[0]!=='@'?'<select id="p-met" aria-label="Donnée à afficher">'+MET.map(m=>`<option value="${m[0]}"${m[0]===curMet?' selected':''}>${m[1]}</option>`).join('')+'</select>':''):'';
   if(!opts.length){$('p-out').innerHTML='<p class="mut">Enregistre des séances pour voir ta progression.</p>';return}
   if(curEx[0]==='@'){
     const t=curEx.slice(1),c=t==='course',rs=S.runs.filter(r=>r.type===t),val=r=>c?r.min/r.km:r.km/(r.min/60),f=c?fp:v=>v.toFixed(1).replace('.',',');
@@ -241,13 +253,14 @@ function renderProgres(){
     <div class="card"><h2>${c?'Allure':'Vitesse'} par jour</h2>${chart(pts,f)}</div>`;
     return;
   }
-  const by={};S.sets.filter(s=>s.ex===curEx).forEach(s=>{by[s.d]=Math.max(by[s.d]||0,s.w)});
-  const pts=Object.keys(by).sort().map(d=>({x:d,y:by[d]}));
-  const rec=Math.max(...pts.map(q=>q.y)),dl=+(pts[pts.length-1].y-pts[0].y).toFixed(1);
-  $('p-out').innerHTML=`<div class="card"><span class="mut">Record</span><div class="big">${rec} <small>kg</small></div>${pts.length>1?pill(dl,'kg'):''}</div><div class="card"><h2>Charge maximale par date</h2>${chart(pts)}</div>`;
+  const rows=S.sets.filter(s=>s.ex===curEx),by={};
+  rows.forEach(s=>{const n=s.n||1,o=by[s.d]=by[s.d]||{w:0,r:0,n:0,v:0};o.w=Math.max(o.w,s.w);o.r=Math.max(o.r,s.r);o.n+=n;o.v+=n*s.r*s.w});
+  const m=MET.find(x=>x[0]===curMet)||MET[0],pts=Object.keys(by).sort().map(d=>({x:d,y:+by[d][m[0]].toFixed(1)}));
+  const rec=Math.max(...pts.map(q=>q.y)),dl=+(pts[pts.length-1].y-pts[0].y).toFixed(1),ld=pts[pts.length-1].x;
+  $('p-out').innerHTML=`<div class="card"><span class="mut">Record : ${m[1].toLowerCase()}</span><div class="big">${rec} <small>${m[2]}</small></div>${pts.length>1?pill(dl,m[2]):''}</div><div class="card"><h2>${m[1]} par date</h2>${chart(pts)}</div><div class="card"><h2>Dernière séance, ${fmtL(ld)}</h2>${rows.filter(s=>s.d===ld).map(s=>`<div class="li"><span>${s.n||1} séries × ${s.r} reps</span><span class="v">${s.w} kg</span></div>`).join('')}</div>`;
 }
 function renderCorps(){
-  $('b-chips').innerHTML=chips(Object.keys(LAB).map(k=>[k,LAB[k][0]]),curM,'m');
+  $('b-chips').innerHTML='<select id="b-sel" aria-label="Mesure à afficher">'+Object.keys(LAB).map(k=>`<option value="${k}"${k===curM?' selected':''}>${esc(LAB[k][0])}</option>`).join('')+'</select>';
   const pts=S.body.filter(b=>b[curM]!=null).sort((a,b)=>a.d.localeCompare(b.d)).map(b=>({x:b.d,y:b[curM]})),u=LAB[curM][1];
   $('b-out').innerHTML=pts.length?`<div class="card"><span class="mut">${LAB[curM][0]}</span><div class="big">${pts[pts.length-1].y} <small>${u}</small></div>${pts.length>1?pill(+(pts[pts.length-1].y-pts[0].y).toFixed(1),u):''}${chart(pts)}</div>`:'<p class="mut">Aucune mesure pour cette courbe.</p>';
   const rows=[...S.body].sort((a,b)=>b.d.localeCompare(a.d));
@@ -255,7 +268,7 @@ function renderCorps(){
 }
 function applyP(){
   document.documentElement.style.setProperty('--acc',P.c||COLORS[0]);
-  $('hi').textContent=P.n?'Salut '+P.n:'Salut';
+  setTitle();
   const wk=new Set([...S.sets,...S.runs].filter(s=>s.d>=ago(6)).map(s=>s.d)).size;
   $('wk').textContent=wk+(wk>1?' jours d\'entraînement':' jour d\'entraînement')+' sur les 7 derniers jours';
   $('u-c').innerHTML=COLORS.map(c=>`<button class="sw${c===(P.c||COLORS[0])?' on':''}" style="background:${c}" data-c="${c}" aria-label="Couleur ${c}"></button>`).join('');
@@ -297,10 +310,7 @@ document.addEventListener('click',e=>{const c=e.target.closest('[data-ex],[data-
   if(c.dataset.sp){curSp=c.dataset.sp;setEd('s',null);renderSeances()}
   if(c.dataset.c){P.c=c.dataset.c;saveP();applyP()}});
 $('u-n').oninput=e=>{P.n=e.target.value.trim();saveP();applyP()};
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');$('t-'+b.dataset.t).classList.add('on');window.scrollTo(0,0);
-});
+
 $('d-exp').onclick=async()=>{
   const j=JSON.stringify(S);$('d-txt').value=j;
   try{await navigator.clipboard.writeText(j);$('d-msg').textContent='Copié dans le presse-papiers. Colle-le dans une note pour le conserver.';P.bk=today();saveP();renderBk()}
@@ -328,16 +338,19 @@ function renderBank(){
   $('s-bank').innerHTML='<option value="">Choisir dans la liste…</option>'+Object.keys(BANK).map(g=>og(g,BANK[g])).join('')+(m.length?og('Mes exercices',m):'');
 }
 function renderToday(){
-  const p=S.plan[wd()],el=$('s-today');
-  if(!p||(!p.name&&!p.ex.length)){el.innerHTML='';return}
-  const dn=n=>S.sets.some(s=>s.d===today()&&s.ex===n);
-  el.innerHTML=`<div class="card"><span class="mut">Aujourd'hui, ${DAYS[wd()].toLowerCase()}</span><h2>${esc(p.name||'Séance prévue')}</h2><div class="chips" style="margin:0">${p.ex.map((x,j)=>`<button class="chip${dn(x.n)?' on':''}" data-tp="${j}">${dn(x.n)?'✓ ':''}${esc(x.n)} · ${x.s} séries</button>`).join('')}</div></div>`;
+  const p=S.plan[wd()],t=today(),has=p&&(p.name||p.ex.length),dn=n=>S.sets.some(s=>s.d===t&&s.ex===n);
+  const lab=x=>`${esc(x.n)} · ${x.s} séries${x.t?' · '+esc(x.t.toLowerCase()):''}`;
+  const card=has?`<div class="card"><span class="mut">Aujourd'hui, ${DAYS[wd()].toLowerCase()}</span><h2>${esc(p.name||'Séance prévue')}</h2><div class="chips" style="margin:0">${p.ex.map((x,j)=>`<button class="chip${dn(x.n)?' on':''}" data-tp="${j}">${dn(x.n)?'✓ ':''}${lab(x)}</button>`).join('')}</div></div>`:'';
+  $('s-today').innerHTML=card;
+  $('a-today').innerHTML=has?card.replace(/<\/div><\/div>$/,`</div><button class="sec" data-chk="${t}" style="margin-top:10px">${S.chk[t]?'✓ Séance faite (décocher)':'Marquer la séance comme faite'}</button></div>`):`<div class="card"><h2>Séance du jour</h2><p class="mut" style="margin:0 0 10px">Aucune séance prévue aujourd'hui.</p><button class="sec" data-go="planning">Voir le planning</button></div>`;
 }
+const TECH=['À l\'échec','Dégressif','Pyramidal','Superset','Rest-pause'];
 function renderPlanEdit(){
-  $('pl-out').innerHTML='<p class="mut">Définis ta semaine type. Le jour même, la séance prévue apparaît dans l\'onglet Séances.</p>'+DAYS.map((D,i)=>{const p=S.plan[i]||{name:'',ex:[]};
-    return `<div class="card"><h2>${D}</h2><input data-plname="${i}" value="${esc(p.name)}" placeholder="Repos ou nom de la séance (ex. Jambes)" aria-label="Nom de la séance ${D}" style="margin-bottom:8px">`+
-    p.ex.map((x,j)=>`<div class="li"><span>${esc(x.n)}</span><span class="v">${x.s} séries<button class="x" data-pl-del="${i}-${j}" aria-label="Retirer">×</button></span></div>`).join('')+
-    `<div class="row" style="margin:10px 0 0"><input id="pl-e-${i}" list="exos" placeholder="Exercice" aria-label="Exercice ${D}"><input id="pl-s-${i}" type="number" inputmode="numeric" min="1" value="3" style="flex:0 0 64px" aria-label="Séries"><button data-pl-add="${i}" style="flex:0 0 52px" aria-label="Ajouter">+</button></div></div>`}).join('');
+  $('pl-out').innerHTML='<p class="mut">Définis ta semaine type. Le jour même, la séance prévue apparaît dans l\'accueil et dans l\'onglet Séances.</p>'+DAYS.map((D,i)=>{const p=S.plan[i]||{name:'',ex:[]};
+    return `<div class="card"><h2>${D}</h2><input data-plname="${i}" value="${esc(p.name)}" placeholder="Nom de la séance (ex. Jambes) si vide = Repos" aria-label="Nom de la séance ${D}" style="margin-bottom:8px">`+
+    p.ex.map((x,j)=>`<div class="li"><span>${esc(x.n)}${x.t?`<br><span class="mut">${esc(x.t)}</span>`:''}</span><span class="v">${x.s} séries<button class="x" data-pl-del="${i}-${j}" aria-label="Retirer">×</button></span></div>`).join('')+
+    `<div class="row" style="margin:10px 0 0"><input id="pl-e-${i}" list="exos" placeholder="Exercice" aria-label="Exercice ${D}"><input id="pl-s-${i}" type="number" inputmode="numeric" min="1" value="3" style="flex:0 0 64px" aria-label="Séries"></div>`+
+    `<div class="row" style="margin:8px 0 0"><select id="pl-t-${i}" aria-label="Technique ${D}"><option value="">Technique : standard</option>${TECH.map(t=>`<option>${esc(t)}</option>`).join('')}</select><button data-pl-add="${i}" style="flex:0 0 52px" aria-label="Ajouter">+</button></div></div>`}).join('');
 }
 const gp=k=>[k.split(':')[0],k.slice(k.indexOf(':')+1)];
 function gcur(g){const[t,k]=gp(g.k);
@@ -361,7 +374,7 @@ function renderGoals(){
       left<0?`Date dépassée${r!=null?', il manque '+r+' '+u:''}. Ce n'est pas un échec : fixe une nouvelle date et continue, chaque séance compte.`:
       c==null?'Pas encore de donnée pour cet objectif.':`Encore ${r} ${u}, ${left} jour${left>1?'s':''} restant${left>1?'s':''}. Continue.`;
     return `<div class="goal"><div class="li" style="border:0;padding:0"><b>${esc(gn(g))} : ${g.t} ${u}</b><button class="x" data-gdel="${g.id}" aria-label="Supprimer l'objectif">×</button></div><div class="mut">Avant le ${fmtL(g.by)}${c!=null?' · actuel '+c+' '+u:''}</div><div class="bar"><i style="width:${Math.round(pc*100)}%"></i></div><p class="mut" style="margin:6px 0 0;${g.done?'color:var(--acc)':''}">${msg}</p></div>`}).join(''):'<p class="mut">Aucun objectif pour l\'instant.</p>';
-  if(ch)save();
+  $('a-goals').innerHTML=$('g-list').innerHTML;if(ch)save();
 }
 const MAC=[['kcal','Calories','kcal'],['p','Protéines','g'],['g','Glucides','g'],['l','Lipides','g']];
 function renderNut(){
@@ -391,9 +404,9 @@ document.addEventListener('click',e=>{
   if(c){
     if(c.dataset.g!==undefined){curG=c.dataset.g;renderBank()}
     else if(c.dataset.xe!==undefined){$('s-e').value=c.dataset.xe;renderBank();$('s-n').focus()}
-    else{const x=S.plan[wd()].ex[+c.dataset.tp];curSp='force';$('s-e').value=x.n;$('s-n').value=x.s;renderSeances();$('s-w').focus()}
+    else{const x=S.plan[wd()].ex[+c.dataset.tp];curSp='force';$('s-e').value=x.n;$('s-n').value=x.s;renderSeances();go('seances');$('s-w').focus()}
   }
-  if(a.plAdd!==undefined){const i=a.plAdd,n=$('pl-e-'+i).value.trim(),sr=Math.round(num($('pl-s-'+i).value))||3;if(!n)return;(S.plan[i]=S.plan[i]||{name:'',ex:[]}).ex.push({n,s:sr});save();renderPlan();renderSeances()}
+  if(a.plAdd!==undefined){const i=a.plAdd,n=$('pl-e-'+i).value.trim(),sr=Math.round(num($('pl-s-'+i).value))||3;if(!n)return;(S.plan[i]=S.plan[i]||{name:'',ex:[]}).ex.push(Object.assign({n,s:sr},$('pl-t-'+i).value?{t:$('pl-t-'+i).value}:{}));save();renderPlan();renderSeances()}
   if(a.plDel){const[i,j]=a.plDel.split('-');S.plan[i].ex.splice(+j,1);save();renderPlan();renderSeances()}
   if(a.gdel&&confirm('Supprimer cet objectif ?')){S.goals=S.goals.filter(g=>g.id!==a.gdel);save();renderGoals()}
   if(a.fdel){S.food=S.food.filter(f=>f.id!==a.fdel);save();renderNut()}
@@ -442,7 +455,7 @@ document.addEventListener('click',e=>{
   const a=e.target.closest('[data-pt],[data-wk],[data-chk]');if(!a)return;
   if(a.dataset.pt){curPl=a.dataset.pt;renderPlan()}
   if(a.dataset.wk){wkOff=Math.min(0,wkOff+ +a.dataset.wk);renderPlan()}
-  if(a.dataset.chk){const d=a.dataset.chk;if(S.chk[d])delete S.chk[d];else S.chk[d]=1;save();renderPlan()}
+  if(a.dataset.chk){const d=a.dataset.chk;if(S.chk[d])delete S.chk[d];else S.chk[d]=1;save();renderPlan();renderToday()}
 });
 let PST='';
 if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().then(ok=>{PST=ok?'Stockage persistant : accordé.':'Stockage persistant : refusé par le navigateur.';renderBk()}).catch(()=>{})}else PST='Stockage persistant : non disponible sur ce navigateur.';
@@ -469,8 +482,16 @@ $('bk-go').onclick=backup;$('d-share').onclick=backup;
 $('d-file').onclick=()=>$('d-fin').click();
 $('d-fin').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('d-txt').value=r.result;$('d-imp').click()};r.readAsText(f);e.target.value=''};
 $('s-bank').onchange=e=>{if(e.target.value){$('s-e').value=e.target.value;renderBank();$('s-n').focus()}};
-document.addEventListener('change',e=>{if(e.target.id==='p-sel'){curEx=e.target.value;renderProgres()}});
-const APP_V='2026-10-01-c';
+document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps()}});
+const MET=[['w','Charge max','kg'],['r','Répétitions (max sur une série)','reps'],['n','Séries (total du jour)','séries'],['v','Volume (séries × reps × kg)','kg']];let curMet='w';
+const TT={accueil:'',seances:'Séances',planning:'Planning',progres:'Progrès',corps:'Corps',nutrition:'Nutrition',donnees:'Réglages'};
+let curT='accueil';
+function setTitle(){$('ttl').textContent=curT==='accueil'?(P.n?'Bonjour, '+P.n:'Bonjour'):TT[curT];$('wk').hidden=curT!=='accueil'}
+function go(t){curT=t;document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));const b=document.querySelector(`nav button[data-t="${t}"]`);if(b)b.classList.add('on');$('t-'+t).classList.add('on');setTitle();window.scrollTo(0,0)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+$('gear').onclick=()=>go('donnees');
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});
+const APP_V='2026-10-01-d';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
