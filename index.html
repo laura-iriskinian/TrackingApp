@@ -96,6 +96,8 @@ nav{background:var(--card)}
 summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
 .it{padding:10px 0}
 .it+.it{border-top:1px solid var(--bd)}
+.seg{flex-wrap:wrap;overflow:visible}
+.seg .chip{flex:1 1 auto;padding:10px 12px;font-size:.9rem;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -103,7 +105,7 @@ summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
 <div id="up" class="card" hidden style="border-color:var(--acc)"><p style="margin:0 0 10px">Une nouvelle version de l'appli est disponible.</p><button id="up-go">Mettre à jour</button></div>
 
 <section id="t-accueil" class="on">
-  <div class="card"><h2>Objectifs</h2><div id="a-goals"></div><button class="sec" data-go="progres" style="margin-top:10px">Gérer les objectifs</button></div>
+  <div class="card"><h2>Objectifs</h2><div id="a-goals"></div><button class="sec" data-go="progres" data-sc="g-card" style="margin-top:10px">Gérer les objectifs</button></div>
   <div id="a-today"></div>
   <div id="bk" class="card" hidden style="border-color:var(--acc)"><p id="bk-t" style="margin:0 0 10px"></p><button id="bk-go">Sauvegarder maintenant</button></div>
 </section>
@@ -132,12 +134,13 @@ summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
 </section>
 
 <section id="t-progres">
-  <div class="card"><h2>Objectifs</h2><div id="g-list"></div>
-    <label for="g-k">Nouvel objectif</label><select id="g-k" style="margin-bottom:10px"></select>
-    <div class="row"><div><label for="g-v" id="g-vl">Valeur cible</label><input id="g-v" type="number" inputmode="decimal" step="0.1"></div><div><label for="g-d">Avant le</label><input id="g-d" type="date"></div></div>
-    <button id="g-add">Ajouter l'objectif</button></div>
-  <div id="p-chips" style="margin-bottom:12px"></div>
+  <div id="p-chips"></div>
   <div id="p-out"></div>
+  <div class="card" id="g-card"><h2>Objectifs</h2><div id="g-list"></div>
+    <details id="g-new"><summary class="mut">+ Nouvel objectif</summary>
+    <label for="g-k">Choisir l'objectif</label><select id="g-k" style="margin-bottom:10px"></select>
+    <div class="row"><div><label for="g-v" id="g-vl">Valeur cible</label><input id="g-v" type="number" inputmode="decimal" step="0.1"></div><div><label for="g-d">Avant le</label><input id="g-d" type="date"></div></div>
+    <button id="g-add">Ajouter l'objectif</button></details></div>
 </section>
 
 <section id="t-corps">
@@ -156,6 +159,7 @@ summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
   </div>
   <div id="b-chips" style="margin-bottom:12px"></div>
   <div id="b-out"></div>
+  <div id="b-weekly"></div>
   <div id="b-list"></div>
 </section>
 
@@ -268,9 +272,11 @@ function renderProgres(){
   const opts=names().map(n=>[n,n]);
   if(S.runs.some(r=>r.type==='course'))opts.push(['@course','Course']);
   if(S.runs.some(r=>r.type==='marche'))opts.push(['@marche','Marche']);
-  if(!opts.some(o=>o[0]===curEx))curEx=opts[0]?opts[0][0]:'';
-  $('p-chips').innerHTML=opts.length?selH('p-sel','Exercice ou sport',opts,curEx,'margin-bottom:8px')+(curEx[0]!=='@'?selH('p-met','Donnée à afficher',MET.map(m=>[m[0],m[1]]),curMet):selH('p-cm','Donnée à afficher',[['d','Distance'],['t','Durée'],['p',curEx==='@course'?'Allure':'Vitesse']],curCm)):'';
+  if(!opts.some(o=>o[0]===curEx))curEx='';
+  const cardio=curEx[0]==='@',mets=cardio?[['d','Distance'],['t','Durée'],['p',curEx==='@course'?'Allure':'Vitesse']]:[['w','Charge'],['r','Reps'],['n','Séries'],['v','Volume']],cur=cardio?curCm:curMet;
+  $('p-chips').innerHTML=opts.length?`<div class="card"><h2>Voir ma progression</h2><label for="p-sel">Exercice ou sport</label><select id="p-sel"><option value=""${curEx?'':' selected'}>Choisir un exercice ou un sport…</option>${opts.map(([v,l])=>`<option value="${esc(v)}"${v===curEx?' selected':''}>${esc(l)}</option>`).join('')}</select>${curEx?`<label style="margin-top:12px">Données à afficher</label><div class="chips seg" style="margin:0">${mets.map(([v,l])=>`<button class="chip${v===cur?' on':''}" data-pm="${v}">${l}</button>`).join('')}</div>`:''}</div>`:'';
   if(!opts.length){$('p-out').innerHTML='<p class="mut">Enregistre des séances pour voir ta progression.</p>';return}
+  if(!curEx){$('p-out').innerHTML='<p class="mut">Choisis un exercice ou un sport pour voir ta progression.</p>';return}
   if(curEx[0]==='@'){
     const t=curEx.slice(1),c=t==='course',rs=S.runs.filter(r=>r.type===t);
     const CM=[['d','Distance','km'],['t','Durée','min'],['p',c?'Allure':'Vitesse',c?'min/km':'km/h']],cm=CM.find(x=>x[0]===curCm)||CM[0],pc=cm[0]==='p'&&c;
@@ -305,7 +311,7 @@ function applyP(){
   const pf=S.prof||{};[['pf-a',pf.age],['pf-h',pf.h],['pf-s',pf.sex]].forEach(([i,v])=>{if(document.activeElement!==$(i))$(i).value=v||''});
   $('u-c').innerHTML=COLORS.map((c,i)=>`<button class="sw${c===(P.c||COLORS[0])?' on':''}" style="background:${c}" data-c="${c}" aria-label="${CN[i]||c}"></button>`).join('');
 }
-const renderAll=()=>{syncLab();renderExtra();renderSeances();renderPlan();renderGoals();renderProgres();renderCorps();renderNut();applyP();renderBk()};
+const renderAll=()=>{syncLab();renderExtra();renderSeances();renderPlan();renderGoals();renderProgres();renderCorps();renderWeekly();renderNut();applyP();renderBk()};
 
 $('s-add').onclick=()=>{
   const d=$('s-d').value;
@@ -430,7 +436,7 @@ $('g-add').onclick=()=>{
   const k=$('g-k').value,t=num($('g-v').value),by=$('g-d').value;
   if(!k||t==null||t<=0||!by){alert('Choisis un objectif, une valeur cible et une date.');return}
   const g={id:uid(),k,t,by};g.s=gcur(g);g.dir=k.startsWith('body:')&&g.s!=null&&g.s>t?'down':'up';
-  S.goals.push(g);save();toast('Objectif ajouté ✓');$('g-v').value='';renderAll();
+  S.goals.push(g);save();toast('Objectif ajouté ✓');$('g-new').open=false;$('g-v').value='';renderAll();
 };
 $('b-custom').onclick=()=>{const n=(prompt('Nom de la mesure (ex. Ventre, Mollet)')||'').trim();if(!n)return;S.custom.push({k:'x'+uid(),n});save();syncLab();renderExtra();renderCorps();$('b-more').open=true};
 document.addEventListener('click',e=>{
@@ -516,7 +522,7 @@ $('bk-go').onclick=backup;$('d-share').onclick=backup;
 $('d-file').onclick=()=>$('d-fin').click();
 $('d-fin').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('d-txt').value=r.result;$('d-imp').click()};r.readAsText(f);e.target.value=''};
 $('s-bank').onchange=e=>{if(e.target.value){$('s-e').value=e.target.value;renderBank();prefill()}};
-document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='g-k')gul();if(i==='p-cm'){curCm=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps()}});
+document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='g-k')gul();if(i==='p-cm'){curCm=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps();renderWeekly()}});
 const MET=[['w','Charge max','kg'],['r','Répétitions (max sur une série)','reps'],['n','Séries (total du jour)','séries'],['v','Volume (séries × reps × kg)','kg']];let curMet='w';
 const TT={accueil:'',seances:'Séances',planning:'Planning',progres:'Progrès',corps:'Corps',nutrition:'Nutrition',donnees:'Réglages'};
 let curT='accueil';
@@ -524,7 +530,7 @@ function setTitle(){$('ttl').textContent=curT==='accueil'?(P.n?'Bonjour, '+P.n:'
 function go(t){curT=t;document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));const b=document.querySelector(`nav button[data-t="${t}"]`);if(b)b.classList.add('on');$('t-'+t).classList.add('on');setTitle();renderBk();window.scrollTo(0,0)}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
 $('gear').onclick=()=>go('donnees');
-document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){go(g.dataset.go);if(g.dataset.sc){const el=$(g.dataset.sc);if(el)el.scrollIntoView()}}const m=e.target.closest('[data-pm]');if(m){if(curEx[0]==='@')curCm=m.dataset.pm;else curMet=m.dataset.pm;renderProgres()}});
 let curCm='d';
 const selH=(id,lab,arr,cur,st)=>`<select id="${id}" aria-label="${lab}"${st?` style="${st}"`:''}>`+arr.map(([v,l])=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(l)}</option>`).join('')+'</select>';
 document.addEventListener('click',e=>{const c=e.target.closest('[data-th]');if(c){P.th=c.dataset.th;saveP();applyP()}});
@@ -593,7 +599,25 @@ document.addEventListener('click',e=>{
   }
   save();renderAll();toast('Enregistré ✓');
 });
-const APP_V='2026-10-07-a';
+const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+let wp='w';
+const PER={
+ d:{art:'au jour',un:'jour',key:d=>d,lab:k=>DAYS[dayIdx(k)]+' '+fmtL(k).slice(0,5),cur:()=>today(),nxt:k=>addD(k,1)},
+ w:{art:'à la semaine',un:'semaine',key:d=>addD(d,-dayIdx(d)),lab:k=>'Semaine du '+fmtL(k).slice(0,5),cur:()=>addD(today(),-dayIdx(today())),nxt:k=>addD(k,7)},
+ m:{art:'au mois',un:'mois',key:d=>d.slice(0,7),lab:k=>MOIS[+k.slice(5)-1]+' '+k.slice(0,4),cur:()=>today().slice(0,7),nxt:k=>{const y=+k.slice(0,4),m=+k.slice(5);return m===12?(y+1)+'-01':y+'-'+String(m+1).padStart(2,'0')}},
+ y:{art:'à l\'année',un:'année',key:d=>d.slice(0,4),lab:k=>k,cur:()=>today().slice(0,4),nxt:k=>String(+k+1)}
+};
+function renderWeekly(){
+  const Q=PER[wp],k=curM,u=LAB[k][1],by={},mean=a=>a.reduce((x,y)=>x+y,0)/a.length,cur=Q.cur();
+  S.body.filter(b=>b[k]!=null).forEach(b=>(by[Q.key(b.d)]=by[Q.key(b.d)]||[]).push(b[k]));
+  const ks=Object.keys(by).sort(),loss=k==='bw'||k==='ventre';
+  const head=`<div class="card"><h2>Évolution : ${esc(LAB[k][0].toLowerCase())}</h2><label>Comparer à la période d'avant</label><div class="chips seg" style="margin:0 0 10px">${[['d','Jour'],['w','Semaine'],['m','Mois'],['y','Année']].map(([v,l])=>`<button class="chip${v===wp?' on':''}" data-wp="${v}">${l}</button>`).join('')}</div>`;
+  if(!ks.length){$('b-weekly').innerHTML=head+'<p class="mut" style="margin:0">Aucune mesure enregistrée pour cette donnée.</p></div>';return}
+  const rows=ks.map((q,i)=>({q,avg:mean(by[q]),d:i?mean(by[q])-mean(by[ks[i-1]]):null,adj:i>0&&Q.nxt(ks[i-1])===q})).reverse().slice(0,8);
+  $('b-weekly').innerHTML=head+`<p class="mut" style="margin:0 0 8px">Moyenne des mesures de chaque ${Q.un}, comparée ${Q.art} d'avant.</p>`+rows.map(r=>{const dd=r.d==null?null:+r.d.toFixed(1);return `<div class="li"><span><b>${Q.lab(r.q)}</b>${r.q===cur?' · en cours':''}<br><span class="mut">${fn(+r.avg.toFixed(1))} ${u}${!r.adj&&dd!=null?' · écart avec la dernière période mesurée':''}</span></span><span class="v ${dd!=null&&dd<0&&loss?'ok':'todo'}">${dd==null?'—':dd===0?'= 0 '+u:(dd>0?'+':'−')+fn(Math.abs(dd))+' '+u}</span></div>`}).join('')+'</div>';
+}
+document.addEventListener('click',e=>{const c=e.target.closest('[data-wp]');if(c){wp=c.dataset.wp;renderWeekly()}});
+const APP_V='2026-10-08-a';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
