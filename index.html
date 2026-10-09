@@ -98,10 +98,20 @@ summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
 .it+.it{border-top:1px solid var(--bd)}
 .seg{flex-wrap:wrap;overflow:visible}
 .seg .chip{flex:1 1 auto;padding:10px 12px;font-size:.9rem;letter-spacing:0}
+#chbtn{position:absolute;top:0;right:52px;width:44px;height:44px;padding:0;background:transparent;border:1px solid var(--bd);color:var(--fg);display:flex;align-items:center;justify-content:center}
+#chbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+h1,.hi{margin-right:104px}
+.stp{display:flex;gap:8px;margin-bottom:12px}
+.stp button{flex:0 0 52px;width:52px;padding:0;font-size:1.5rem}
+.stp input{text-align:center;font:700 1.4rem var(--fd)}
+#ch-time{font-size:min(24vw,6rem);margin:4px 0}
+#ch-box.w{background:color-mix(in srgb,var(--acc) 18%,var(--card));border-color:var(--acc)}
+#ch-box.p{border-style:dashed;border-color:var(--acc)}
+#ch-box.w #ch-time{color:var(--acct)}
 </style>
 </head>
 <body>
-<header><p class="hi">Suivi sport</p><h1 id="ttl"></h1><p class="mut" id="wk"></p><button id="gear" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></button></header>
+<header><p class="hi">Suivi sport</p><h1 id="ttl"></h1><p class="mut" id="wk"></p><button id="gear" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></button><button id="chbtn" aria-label="Chronomètre"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></button></header>
 <div id="up" class="card" hidden style="border-color:var(--acc)"><p style="margin:0 0 10px">Une nouvelle version de l'appli est disponible.</p><button id="up-go">Mettre à jour</button></div>
 
 <section id="t-accueil" class="on">
@@ -183,6 +193,21 @@ summary{padding:8px 0;cursor:pointer;margin-bottom:6px}
   <div class="card"><h2>Objectifs journaliers</h2>
     <div class="row"><div><label for="n-gkcal">kcal</label><input id="n-gkcal" type="number" inputmode="decimal"></div><div><label for="n-gp">Prot. (g)</label><input id="n-gp" type="number" inputmode="decimal"></div><div><label for="n-gg">Gluc. (g)</label><input id="n-gg" type="number" inputmode="decimal"></div><div><label for="n-gl">Lip. (g)</label><input id="n-gl" type="number" inputmode="decimal"></div></div>
     <p class="mut" style="margin:0">Valeurs de départ modifiables, sans valeur de recommandation. À adapter à ton besoin.</p></div>
+</section>
+
+<section id="t-chrono">
+  <div class="card" id="ch-box">
+    <p class="mut" id="ch-lab" style="margin:0">Prêt</p>
+    <div class="big" id="ch-time" role="timer">00:30</div>
+    <p class="mut" id="ch-round" style="margin:6px 0 10px;min-height:1.4em"></p>
+    <div class="bar"><i id="ch-bar" style="width:0%"></i></div>
+    <div class="row" style="margin:14px 0 0"><button id="ch-go">Démarrer</button><button id="ch-rst" class="sec">Réinitialiser</button></div>
+  </div>
+  <div class="card">
+    <label for="ch-w">Exercice (secondes)</label><div class="stp"><button data-st="ch-w:-5" aria-label="Moins">−</button><input id="ch-w" type="number" inputmode="numeric" min="0"><button data-st="ch-w:5" aria-label="Plus">+</button></div><label for="ch-r">Repos (secondes)</label><div class="stp"><button data-st="ch-r:-5" aria-label="Moins">−</button><input id="ch-r" type="number" inputmode="numeric" min="0"><button data-st="ch-r:5" aria-label="Plus">+</button></div><label for="ch-n">Répétitions (nombre de tours)</label><div class="stp"><button data-st="ch-n:-1" aria-label="Moins">−</button><input id="ch-n" type="number" inputmode="numeric" min="0"><button data-st="ch-n:1" aria-label="Plus">+</button></div><label for="ch-p">Préparation avant le départ (secondes)</label><div class="stp"><button data-st="ch-p:-5" aria-label="Moins">−</button><input id="ch-p" type="number" inputmode="numeric" min="0"><button data-st="ch-p:5" aria-label="Plus">+</button></div>
+    <p class="mut" id="ch-tot" style="margin:0"></p>
+  </div>
+  <p class="mut" id="ch-note"></p>
 </section>
 
 <section id="t-donnees">
@@ -524,7 +549,7 @@ $('d-fin').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileR
 $('s-bank').onchange=e=>{if(e.target.value){$('s-e').value=e.target.value;renderBank();prefill()}};
 document.addEventListener('change',e=>{const i=e.target.id;if(i==='p-sel'){curEx=e.target.value;renderProgres()}if(i==='p-met'){curMet=e.target.value;renderProgres()}if(i==='g-k')gul();if(i==='p-cm'){curCm=e.target.value;renderProgres()}if(i==='b-sel'){curM=e.target.value;renderCorps();renderWeekly()}});
 const MET=[['w','Charge max','kg'],['r','Répétitions (max sur une série)','reps'],['n','Séries (total du jour)','séries'],['v','Volume (séries × reps × kg)','kg']];let curMet='w';
-const TT={accueil:'',seances:'Séances',planning:'Planning',progres:'Progrès',corps:'Corps',nutrition:'Nutrition',donnees:'Réglages'};
+const TT={chrono:'Chrono',accueil:'',seances:'Séances',planning:'Planning',progres:'Progrès',corps:'Corps',nutrition:'Nutrition',donnees:'Réglages'};
 let curT='accueil';
 function setTitle(){$('ttl').textContent=curT==='accueil'?(P.n?'Bonjour, '+P.n:'Bonjour'):TT[curT];$('wk').hidden=curT!=='accueil'}
 function go(t){curT=t;document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));const b=document.querySelector(`nav button[data-t="${t}"]`);if(b)b.classList.add('on');$('t-'+t).classList.add('on');setTitle();renderBk();window.scrollTo(0,0)}
@@ -617,7 +642,50 @@ function renderWeekly(){
   $('b-weekly').innerHTML=head+`<p class="mut" style="margin:0 0 8px">Moyenne des mesures de chaque ${Q.un}, comparée ${Q.art} d'avant.</p>`+rows.map(r=>{const dd=r.d==null?null:+r.d.toFixed(1);return `<div class="li"><span><b>${Q.lab(r.q)}</b>${r.q===cur?' · en cours':''}<br><span class="mut">${fn(+r.avg.toFixed(1))} ${u}${!r.adj&&dd!=null?' · écart avec la dernière période mesurée':''}</span></span><span class="v ${dd!=null&&dd<0&&loss?'ok':'todo'}">${dd==null?'—':dd===0?'= 0 '+u:(dd>0?'+':'−')+fn(Math.abs(dd))+' '+u}</span></div>`}).join('')+'</div>';
 }
 document.addEventListener('click',e=>{const c=e.target.closest('[data-wp]');if(c){wp=c.dataset.wp;renderWeekly()}});
-const APP_V='2026-10-08-a';
+const CH={ph:[],cum:[],run:false,t0:0,pe:0,idx:-1,beeped:{},tick:null,ctx:null,wl:null,fin:false,v:null};
+const chv=id=>Math.max(0,Math.round(num($(id).value)||0)),fmtMS=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
+function chTotal(){const w=chv('ch-w'),r=chv('ch-r'),n=chv('ch-n'),p=chv('ch-p'),t=p+n*w+Math.max(0,n-1)*r;$('ch-tot').textContent='Durée totale : '+Math.floor(t/60)+' min '+String(t%60).padStart(2,'0')+' s ('+n+' × '+w+' s d\'exercice, '+Math.max(0,n-1)+' repos de '+r+' s)'}
+function beep(f,d){const c=CH.ctx;if(!c)return;try{const o=c.createOscillator(),g=c.createGain(),t=c.currentTime;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.3,t+.01);g.gain.linearRampToValueAtTime(0,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d+.02)}catch(e){}try{navigator.vibrate&&navigator.vibrate(d>.2?200:60)}catch(e){}}
+function audioOn(){try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}if(!CH.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)CH.ctx=new A()}if(CH.ctx&&CH.ctx.state==='suspended')CH.ctx.resume()}
+async function wlOn(){try{if(navigator.wakeLock&&!CH.wl)CH.wl=await navigator.wakeLock.request('screen')}catch(e){}}
+function wlOff(){try{CH.wl&&CH.wl.release()}catch(e){}CH.wl=null}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&CH.run){CH.wl=null;wlOn()}});
+function chBuild(){const w=chv('ch-w'),r=chv('ch-r'),n=chv('ch-n'),p=chv('ch-p'),ph=[];if(p>0)ph.push({t:'p',d:p});for(let i=1;i<=n;i++){ph.push({t:'w',d:w,i});if(i<n&&r>0)ph.push({t:'r',d:r,i})}return ph}
+function chDraw(){
+  const v=CH.v,lock=CH.ph.length>0&&!CH.fin,nw=CH.ph.filter(x=>x.t==='w').length;
+  document.querySelectorAll('#t-chrono input,#t-chrono [data-st]').forEach(e=>e.disabled=lock);
+  $('ch-go').textContent=CH.run?'Pause':lock?'Reprendre':CH.fin?'Recommencer':'Démarrer';
+  let lab='Prêt',time=fmtMS(chv('ch-w')),rd='',pr=0,cl='';
+  if(CH.fin){lab='Terminé ✓';time='00:00';rd=nw+' tours faits';pr=100}
+  else if(v){const x=CH.ph[v.i];lab={p:'Préparation',w:'Exercice',r:'Repos'}[x.t]+(CH.run?'':' (en pause)');time=fmtMS(Math.ceil(v.left));rd=x.t==='w'?'Tour '+x.i+' / '+nw:x.t==='r'?'Prochain : tour '+(x.i+1)+' / '+nw:'';pr=Math.round((1-v.left/x.d)*100);cl=x.t}
+  $('ch-box').className='card '+cl;$('ch-lab').textContent=lab;$('ch-time').textContent=time;$('ch-round').textContent=rd;$('ch-bar').style.width=pr+'%';
+}
+function chTick(){
+  const e=Date.now()-CH.t0,tot=CH.cum[CH.cum.length-1];
+  if(e>=tot){clearInterval(CH.tick);CH.run=false;CH.fin=true;wlOff();[0,300,600].forEach(d=>setTimeout(()=>beep(988,.2),d));chDraw();return}
+  const i=CH.cum.findIndex(x=>e<x),left=(CH.cum[i]-e)/1000,sl=Math.ceil(left);
+  let st=false;if(i!==CH.idx){CH.idx=i;st=true;const t=CH.ph[i].t;beep(t==='w'?880:t==='r'?523:659,.4)}
+  if(!st&&sl<=3&&sl>=1&&!CH.beeped[i+':'+sl]){CH.beeped[i+':'+sl]=1;beep(660,.12)}
+  CH.v={i,left};chDraw();
+}
+function chToggle(){
+  if(CH.run){CH.pe=Date.now()-CH.t0;CH.run=false;clearInterval(CH.tick);wlOff();chDraw();return}
+  audioOn();
+  if(!CH.ph.length||CH.fin){
+    if(chv('ch-w')<1||chv('ch-n')<1){alert("Indique au moins 1 seconde d'exercice et 1 répétition.");return}
+    P.ch={w:chv('ch-w'),r:chv('ch-r'),n:chv('ch-n'),p:chv('ch-p')};saveP();
+    CH.ph=chBuild();let c=0;CH.cum=CH.ph.map(x=>c+=x.d*1000);CH.pe=0;CH.idx=-1;CH.beeped={};CH.fin=false;CH.v=null;
+  }
+  CH.t0=Date.now()-CH.pe;CH.run=true;CH.tick=setInterval(chTick,100);wlOn();chTick();
+}
+function chReset(){clearInterval(CH.tick);CH.run=false;CH.ph=[];CH.cum=[];CH.fin=false;CH.v=null;CH.pe=0;wlOff();chDraw()}
+$('ch-go').onclick=chToggle;$('ch-rst').onclick=chReset;
+['ch-w','ch-r','ch-n','ch-p'].forEach(id=>$(id).addEventListener('input',()=>{chTotal();chDraw()}));
+document.addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!b||b.disabled)return;const[id,dl]=b.dataset.st.split(':');$(id).value=Math.max({'ch-w':1,'ch-r':0,'ch-n':1,'ch-p':0}[id],chv(id)+ +dl);chTotal();chDraw()});
+$('chbtn').onclick=()=>go('chrono');
+(()=>{const c=P.ch||{w:30,r:15,n:8,p:5};['w','r','n','p'].forEach(k=>$('ch-'+k).value=c[k]);chTotal();chDraw();
+  $('ch-note').textContent='Garde l\'appli ouverte pendant l\'exercice : si l\'écran s\'éteint, le chrono et les sons peuvent s\'arrêter.'+(navigator.wakeLock?'':' Ton navigateur ne peut pas garder l\'écran allumé tout seul.')+' Sur iPhone, le son peut être coupé quand le bouton silencieux est activé.'})();
+const APP_V='2026-10-08-b';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
