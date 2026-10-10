@@ -587,7 +587,7 @@ function renderRecent(){
 }
 document.addEventListener('click',e=>{const c=e.target.closest('[data-fd]');if(!c)return;const f=[...S.food].reverse().find(x=>x.n===c.dataset.fd);if(!f)return;$('n-n').value=f.n;MAC.forEach(([k])=>$('n-'+k).value=f[k]!=null?f[k]:'')});
 const gul=()=>{const k=$('g-k').value;if(k)$('g-vl').textContent='Valeur cible ('+gu({k})+')'};
-const savePf=()=>{S.prof={age:num($('pf-a').value)||undefined,h:num($('pf-h').value)||undefined,sex:$('pf-s').value||undefined};save();renderAll()};
+const savePf=()=>{S.prof=Object.assign({},S.prof,{age:num($('pf-a').value)||undefined,h:num($('pf-h').value)||undefined,sex:$('pf-s').value||undefined});save();renderAll()};
 ['pf-a','pf-h','pf-s'].forEach(i=>$(i).addEventListener('change',savePf));
 document.addEventListener('keydown',e=>{
   if(e.key!=='Enter'||e.target.tagName!=='INPUT'||e.target.type==='date'||/^n-g(kcal|p|g|l)$/.test(e.target.id)||/^pl-|^pf-|^g-|^u-/.test(e.target.id)||e.target.dataset.plname!==undefined)return;
@@ -625,10 +625,10 @@ document.addEventListener('click',e=>{
   save();renderAll();toast('Enregistré ✓');
 });
 const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-let wp='w';
+let wp='w';const wk0=d=>addD(d,-((dayIdx(d)-((S.prof&&S.prof.ws)||0)+7)%7));
 const PER={
  d:{art:'au jour',un:'jour',key:d=>d,lab:k=>DAYS[dayIdx(k)]+' '+fmtL(k).slice(0,5),cur:()=>today(),nxt:k=>addD(k,1)},
- w:{art:'à la semaine',un:'semaine',key:d=>addD(d,-dayIdx(d)),lab:k=>'Semaine du '+fmtL(k).slice(0,5),cur:()=>addD(today(),-dayIdx(today())),nxt:k=>addD(k,7)},
+ w:{art:'à la semaine',un:'semaine',key:wk0,lab:k=>'Semaine du '+fmtL(k).slice(0,5)+' au '+fmtL(addD(k,6)).slice(0,5),cur:()=>wk0(today()),nxt:k=>addD(k,7)},
  m:{art:'au mois',un:'mois',key:d=>d.slice(0,7),lab:k=>MOIS[+k.slice(5)-1]+' '+k.slice(0,4),cur:()=>today().slice(0,7),nxt:k=>{const y=+k.slice(0,4),m=+k.slice(5);return m===12?(y+1)+'-01':y+'-'+String(m+1).padStart(2,'0')}},
  y:{art:'à l\'année',un:'année',key:d=>d.slice(0,4),lab:k=>k,cur:()=>today().slice(0,4),nxt:k=>String(+k+1)}
 };
@@ -636,12 +636,13 @@ function renderWeekly(){
   const Q=PER[wp],k=curM,u=LAB[k][1],by={},mean=a=>a.reduce((x,y)=>x+y,0)/a.length,cur=Q.cur();
   S.body.filter(b=>b[k]!=null).forEach(b=>(by[Q.key(b.d)]=by[Q.key(b.d)]||[]).push(b[k]));
   const ks=Object.keys(by).sort(),loss=k==='bw'||k==='ventre';
-  const head=`<div class="card"><h2>Évolution : ${esc(LAB[k][0].toLowerCase())}</h2><label>Comparer à la période d'avant</label><div class="chips seg" style="margin:0 0 10px">${[['d','Jour'],['w','Semaine'],['m','Mois'],['y','Année']].map(([v,l])=>`<button class="chip${v===wp?' on':''}" data-wp="${v}">${l}</button>`).join('')}</div>`;
+  const head=`<div class="card"><h2>Évolution : ${esc(LAB[k][0].toLowerCase())}</h2><label>Comparer à la période d'avant</label><div class="chips seg" style="margin:0 0 10px">${[['d','Jour'],['w','Semaine'],['m','Mois'],['y','Année']].map(([v,l])=>`<button class="chip${v===wp?' on':''}" data-wp="${v}">${l}</button>`).join('')}</div>${wp==='w'?`<label for="ev-ws">La semaine commence le</label><select id="ev-ws" style="margin-bottom:6px">${DAYS.map((D,i)=>`<option value="${i}"${i===((S.prof&&S.prof.ws)||0)?' selected':''}>${D}</option>`).join('')}</select><p class="mut" style="margin:0 0 10px">Choisis ton jour de pesée habituel : chaque semaine commence ce jour-là.</p>`:''}`;
   if(!ks.length){$('b-weekly').innerHTML=head+'<p class="mut" style="margin:0">Aucune mesure enregistrée pour cette donnée.</p></div>';return}
   const rows=ks.map((q,i)=>({q,avg:mean(by[q]),d:i?mean(by[q])-mean(by[ks[i-1]]):null,adj:i>0&&Q.nxt(ks[i-1])===q})).reverse().slice(0,8);
   $('b-weekly').innerHTML=head+`<p class="mut" style="margin:0 0 8px">Moyenne des mesures de chaque ${Q.un}, comparée ${Q.art} d'avant.</p>`+rows.map(r=>{const dd=r.d==null?null:+r.d.toFixed(1);return `<div class="li"><span><b>${Q.lab(r.q)}</b>${r.q===cur?' · en cours':''}<br><span class="mut">${fn(+r.avg.toFixed(1))} ${u}${!r.adj&&dd!=null?' · écart avec la dernière période mesurée':''}</span></span><span class="v ${dd!=null&&dd<0&&loss?'ok':'todo'}">${dd==null?'—':dd===0?'= 0 '+u:(dd>0?'+':'−')+fn(Math.abs(dd))+' '+u}</span></div>`}).join('')+'</div>';
 }
 document.addEventListener('click',e=>{const c=e.target.closest('[data-wp]');if(c){wp=c.dataset.wp;renderWeekly()}});
+document.addEventListener('change',e=>{if(e.target.id==='ev-ws'){S.prof=Object.assign({},S.prof,{ws:+e.target.value});save();renderWeekly()}});
 const CH={ph:[],cum:[],run:false,t0:0,pe:0,idx:-1,beeped:{},tick:null,ctx:null,wl:null,fin:false,v:null};
 const chv=id=>Math.max(0,Math.round(num($(id).value)||0)),fmtMS=t=>String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
 function chTotal(){const w=chv('ch-w'),r=chv('ch-r'),n=chv('ch-n'),p=chv('ch-p'),t=p+n*w+Math.max(0,n-1)*r;$('ch-tot').textContent='Durée totale : '+Math.floor(t/60)+' min '+String(t%60).padStart(2,'0')+' s ('+n+' × '+w+' s d\'exercice, '+Math.max(0,n-1)+' repos de '+r+' s)'}
@@ -685,7 +686,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!
 $('chbtn').onclick=()=>go('chrono');
 (()=>{const c=P.ch||{w:30,r:15,n:8,p:5};['w','r','n','p'].forEach(k=>$('ch-'+k).value=c[k]);chTotal();chDraw();
   $('ch-note').textContent='Garde l\'appli ouverte pendant l\'exercice : si l\'écran s\'éteint, le chrono et les sons peuvent s\'arrêter.'+(navigator.wakeLock?'':' Ton navigateur ne peut pas garder l\'écran allumé tout seul.')+' Sur iPhone, le son peut être coupé quand le bouton silencieux est activé.'})();
-const APP_V='2026-10-08-b';
+const APP_V='2026-10-09-a';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
