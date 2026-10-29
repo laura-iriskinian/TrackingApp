@@ -95,6 +95,7 @@ export interface Profile {
   heightCm?: number
   sex?: 'f' | 'h'
   weekStart: number
+  restSec: number // repos par défaut entre deux séries
   nutritionTargets: { kcal: number; protein: number; carbs: number; fat: number }
 }
 

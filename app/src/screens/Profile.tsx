@@ -51,6 +51,14 @@ export function Profile() {
             onChange={e => saveProfile({ name: e.target.value.trim() || undefined })} />
         </div>
         <div className="field">
+          <span className="sub" id="sx-l">Silhouette des schémas</span>
+          <div className="seg" role="group" aria-labelledby="sx-l">
+            {([['f', 'Femme'], ['h', 'Homme']] as const).map(([v, l]) => (
+              <button key={v} aria-pressed={(profile?.sex ?? 'h') === v} onClick={() => saveProfile({ sex: v })}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
           <span className="sub" id="th-l">Apparence</span>
           <div className="seg" role="group" aria-labelledby="th-l">
             {([['light', 'Clair'], ['dark', 'Sombre'], ['auto', 'Automatique']] as [Theme, string][]).map(([v, l]) => (

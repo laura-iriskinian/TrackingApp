@@ -3,6 +3,7 @@ import { Home } from './screens/Home'
 import { Workouts } from './screens/Workouts'
 import { Progress } from './screens/Progress'
 import { Profile } from './screens/Profile'
+import { Session } from './screens/Session'
 import { ToastProvider } from './components/ui'
 
 const TABS = [
@@ -12,8 +13,8 @@ const TABS = [
   { id: 'profil', label: 'Profil', icon: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, Screen: Profile },
 ] as const
 
-type TabId = (typeof TABS)[number]['id']
-const fromHash = (): TabId => (TABS.find(t => '#' + t.id === location.hash)?.id ?? 'accueil')
+type TabId = (typeof TABS)[number]['id'] | 'seance'
+const fromHash = (): TabId => (location.hash === '#seance' ? 'seance' : TABS.find(t => '#' + t.id === location.hash)?.id ?? 'accueil')
 
 export default function App() {
   const [tab, setTab] = useState<TabId>(fromHash)
@@ -28,6 +29,10 @@ export default function App() {
     history.replaceState(null, '', '#' + id)
     setTab(id)
     scrollTo(0, 0)
+  }
+
+  if (tab === 'seance') {
+    return <ToastProvider><main><Session onClose={() => go('accueil')} /></main></ToastProvider>
   }
 
   const { Screen } = TABS.find(t => t.id === tab)!

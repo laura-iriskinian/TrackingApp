@@ -2,11 +2,18 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { allExercises, db } from '../data/db'
 import { longDate, MONTHS, parse } from '../lib/dates'
 import { entrySummary } from '../lib/summary'
+import { getSession, startSession } from '../data/session'
+import { openSession } from '../lib/nav'
 
 export function Workouts() {
   const workouts = useLiveQuery(() => db.workouts.orderBy('date').reverse().toArray())
   const exercises = useLiveQuery(allExercises) ?? []
   const exById = (id: string) => exercises.find(e => e.id === id)
+  const active = useLiveQuery(getSession)
+  const start = async () => {
+    if (!active) await startSession(undefined, [], exercises)
+    openSession()
+  }
 
   const byMonth = new Map<string, NonNullable<typeof workouts>>()
   for (const w of workouts ?? []) {
@@ -17,12 +24,13 @@ export function Workouts() {
   return (
     <div className="screen">
       <header className="head"><h1>Séances</h1></header>
+      <button className="btn go" onClick={start}>{active ? 'Reprendre la séance en cours' : 'Nouvelle séance'}</button>
 
       {workouts && !workouts.length && (
         <section className="card">
           <h2>Aucune séance pour l'instant</h2>
           <p className="sub">
-            La saisie guidée, série par série, arrive dans la prochaine version.
+            Lance une séance : tu notes chaque série, et le repos se déclenche tout seul.
             Si tu utilises Suivi sport sur ce téléphone, tu peux récupérer ton historique depuis l'onglet Profil.
           </p>
         </section>

@@ -30,6 +30,7 @@ export const newId = () => crypto.randomUUID()
 
 export const DEFAULT_PROFILE: Profile = {
   weekStart: 0,
+  restSec: 90,
   nutritionTargets: { kcal: 2000, protein: 100, carbs: 250, fat: 70 },
 }
 

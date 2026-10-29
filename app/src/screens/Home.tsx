@@ -6,6 +6,8 @@ import { addDays, DAYS, fmtThousands, longDate, parse, today, weekday, weekStart
 import { musclesOf, volume } from '../lib/summary'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
+import { getSession, startSession } from '../data/session'
+import { openSession } from '../lib/nav'
 import './Home.css'
 
 export function Home() {
@@ -18,20 +20,26 @@ export function Home() {
   const legacy = useMemo(legacySummary, [])
   const toast = useToast()
   const [importing, setImporting] = useState(false)
+  const active = useLiveQuery(getSession)
 
   const exById = (id: string) => exercises.find(e => e.id === id)
   const doneDays = new Set(recent.map(w => w.date))
   const planOf = (d: string) => plans.find(p => p.weekday === weekday(d) && (p.title || p.items.length))
 
-  const start = weekStartOf(t, profile?.weekStart ?? 0)
-  const week = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+  const weekStart = weekStartOf(t, profile?.weekStart ?? 0)
+  const week = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const month = t.slice(0, 7)
   const sessionsThisMonth = recent.filter(w => w.date.startsWith(month)).length
-  const weekVolume = recent.filter(w => w.date >= start).reduce((a, w) => a + w.entries.reduce((b, e) => b + volume(e.sets), 0), 0)
+  const weekVolume = recent.filter(w => w.date >= weekStart).reduce((a, w) => a + w.entries.reduce((b, e) => b + volume(e.sets), 0), 0)
 
   const plan = planOf(t)
   const planEx = plan?.items.map(i => exById(i.exerciseId)) ?? []
   const muscles = musclesOf(planEx)
+
+  const start = async (title?: string, items = plan?.items ?? []) => {
+    if (!active) await startSession(title, items, exercises)
+    openSession()
+  }
 
   const recover = async () => {
     setImporting(true)
@@ -51,6 +59,14 @@ export function Home() {
         <span className="sub">{longDate(t)}</span>
         <h1>{profile?.name ? `Bonjour ${profile.name}` : 'Bonjour'}</h1>
       </header>
+
+      {active && (
+        <button className="card resume" onClick={openSession}>
+          <span className="eyebrow">Séance en cours</span>
+          <b>{active.title || 'Séance libre'}</b>
+          <span className="resume-go">Reprendre</span>
+        </button>
+      )}
 
       {legacy && isEmpty && (
         <section className="card legacy">
@@ -104,12 +120,14 @@ export function Home() {
               ))}
             </ol>
           )}
+          {!active && <button className="btn go" onClick={() => start(plan.title || undefined)}>Commencer la séance</button>}
         </section>
       ) : (
         <section className="card">
           <span className="eyebrow">Séance du jour</span>
           <h2>Pas de séance prévue</h2>
           <p className="sub">Profite du repos, ou entraîne-toi librement.</p>
+          {!active && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
         </section>
       )}
 

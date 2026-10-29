@@ -67,6 +67,7 @@ button { cursor: pointer; }
 }
 .btn.soft { background: var(--paper); color: var(--ink); }
 .btn.danger { background: transparent; color: var(--effort); box-shadow: inset 0 0 0 1.5px var(--effort); }
+.btn.go { background: var(--effort); color: var(--on-effort); }
 .btn:disabled { opacity: .4; cursor: default; }
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; min-width: 0; }
@@ -131,5 +132,6 @@ button { cursor: pointer; }
 .m.s { fill: var(--effort-2); }
 .m.p { fill: var(--effort); }
 .b { fill: var(--body); }
+.outline { fill: none; stroke: var(--muscle); stroke-width: 1; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
