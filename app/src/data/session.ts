@@ -37,18 +37,23 @@ export async function lastSets(exerciseId: string): Promise<SetLog[]> {
 
 // Prépare un exercice : nombre et type des séries prévus, valeurs reprises de la dernière fois.
 // Sans planning, le type de chaque série est aussi repris de la dernière fois.
-export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, 'sets' | 'types' | 'group'>): Entry {
+// Pour un exercice jamais fait, les répétitions partent du bas de l'objectif prévu (« 8-12 » → 8).
+export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, 'sets' | 'types' | 'group' | 'target'>): Entry {
   const n = item?.sets || item?.types?.length || last.length || (ex.kind === 'cardio' ? 1 : DEFAULT_SETS)
+  const goal = parseInt(item?.target ?? '')
   const sets: SetLog[] = Array.from({ length: n }, (_, i) => {
     const p = last[Math.min(i, last.length - 1)]
     const type = item?.types ? item.types[i] ?? undefined : item?.sets ? undefined : p?.type
     const s: SetLog = ex.kind === 'cardio'
       ? { km: p?.km, min: p?.min, done: false }
-      : { weight: p?.weight, reps: p?.reps, done: false }
+      : { weight: p?.weight, reps: p?.reps ?? (goal > 0 ? goal : undefined), done: false }
     if (type) s.type = type
     return s
   })
-  return item?.group ? { exerciseId: ex.id, group: item.group, sets } : { exerciseId: ex.id, sets }
+  const e: Entry = { exerciseId: ex.id, sets }
+  if (item?.group) e.group = item.group
+  if (item?.target) e.target = item.target
+  return e
 }
 
 export async function startSession(title: string | undefined, items: PlanItem[], exercises: Exercise[]) {

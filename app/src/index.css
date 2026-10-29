@@ -177,3 +177,6 @@ button { cursor: pointer; }
 .goal-foot .late { color: var(--ink); }
 .m-val { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .m-val b { color: var(--ink); }
+.body-since { color: var(--ink); font-weight: 600; }
+.body-prev { justify-self: start; color: var(--mute); padding: 0; font-size: .85rem; }
+.m-val > .data:first-child { margin-right: 6px; }

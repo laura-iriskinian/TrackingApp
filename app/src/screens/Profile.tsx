@@ -8,6 +8,8 @@ import { checkBackup, MAX_BACKUP_BYTES, restoreBackup, type CheckedBackup } from
 import { applyTheme, type Theme } from '../lib/theme'
 import { ConfirmSheet, useToast } from '../components/ui'
 import { Mark } from '../components/Logo'
+import { GOALS, LEVELS, PROGRAMS } from '../data/programs'
+import { openPrograms } from '../lib/nav'
 
 type Sheet = 'legacy' | 'erase' | 'restore' | 'paste' | null
 
@@ -80,6 +82,22 @@ export function Profile() {
           </div>
         </div>
         <div className="field">
+          <span className="sub" id="gl-l">Objectif</span>
+          <div className="seg" role="group" aria-labelledby="gl-l">
+            {GOALS.map(g => (
+              <button key={g.id} aria-pressed={profile?.goal === g.id} onClick={() => saveProfile({ goal: g.id })}>{{ muscle: 'Muscle', fit: 'Forme', loss: 'Poids' }[g.id]}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span className="sub" id="lv-l">Niveau</span>
+          <div className="seg" role="group" aria-labelledby="lv-l">
+            {LEVELS.map(l => (
+              <button key={l.id} aria-pressed={profile?.level === l.id} onClick={() => saveProfile({ level: l.id })}>{l.id === 'beginner' ? 'Débutant' : 'Confirmé'}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
           <span className="sub" id="wt-l">Objectif de séances par semaine</span>
           <div className="seg" role="group" aria-labelledby="wt-l">
             {[1, 2, 3, 4, 5, 6].map(n => (
@@ -106,6 +124,13 @@ export function Profile() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="card">
+        <h2>Programme</h2>
+        <p className="sub">{PROGRAMS.find(p => p.id === profile?.program)?.name ?? 'Aucun programme tout prêt pour l’instant.'}</p>
+        <button className="btn soft" onClick={openPrograms}>Voir les programmes</button>
+        <button className="link inline-link" style={{ justifySelf: 'start' }} onClick={() => saveProfile({ onboarded: false })}>Refaire le premier lancement</button>
       </section>
 
       <section className="card">

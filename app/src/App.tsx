@@ -1,3 +1,4 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Home } from './screens/Home'
 import { Workouts } from './screens/Workouts'
@@ -7,6 +8,10 @@ import { Session } from './screens/Session'
 import { WorkoutEdit } from './screens/WorkoutEdit'
 import { Planning } from './screens/Planning'
 import { Timer } from './screens/Timer'
+import { Exercises } from './screens/Exercises'
+import { Programs } from './screens/Programs'
+import { Onboarding } from './screens/Onboarding'
+import { db, getProfile } from './data/db'
 import { backTo } from './lib/nav'
 import { ToastProvider } from './components/ui'
 
@@ -17,8 +22,8 @@ const TABS = [
   { id: 'profil', label: 'Profil', icon: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, Screen: Profile },
 ] as const
 
-type TabId = (typeof TABS)[number]['id'] | 'seance' | 'planning' | 'chrono' | `seance-passee${string}`
-const FULL = ['seance', 'planning', 'chrono']
+type TabId = (typeof TABS)[number]['id'] | 'seance' | 'planning' | 'chrono' | 'exercices' | 'programmes' | `seance-passee${string}`
+const FULL = ['seance', 'planning', 'chrono', 'exercices', 'programmes']
 const fromHash = (): TabId => {
   const h = location.hash.slice(1)
   if (FULL.includes(h) || h === 'seance-passee' || h.startsWith('seance-passee/')) return h as TabId
@@ -27,6 +32,11 @@ const fromHash = (): TabId => {
 
 export default function App() {
   const [tab, setTab] = useState<TabId>(fromHash)
+  // Premier lancement guidé : seulement sans séance enregistrée, ou si on demande à le refaire depuis le Profil
+  const onboarding = useLiveQuery(async () => {
+    const p = await getProfile()
+    return p.onboarded === false || (p.onboarded !== true && (await db.workouts.count()) === 0 && !(await db.kv.get('session')))
+  })
 
   useEffect(() => {
     const onHash = () => setTab(fromHash())
@@ -41,8 +51,12 @@ export default function App() {
   }
 
   const full = (node: ReactNode) => <ToastProvider><main>{node}</main></ToastProvider>
+  if (onboarding === undefined) return null
+  if (onboarding) return full(<Onboarding />)
   if (tab === 'seance') return full(<Session onClose={() => go('accueil')} />)
   if (tab === 'planning') return full(<Planning onClose={() => go(backTo('accueil') as TabId)} />)
+  if (tab === 'exercices') return full(<Exercises onClose={() => go(backTo('seances') as TabId)} />)
+  if (tab === 'programmes') return full(<Programs onClose={() => go(backTo('seances') as TabId)} />)
   if (tab === 'chrono') return full(<Timer onClose={() => go(backTo('seances') as TabId)} />)
   if (tab.startsWith('seance-passee')) return full(<WorkoutEdit key={tab} id={tab.split('/')[1]} onClose={() => go('seances')} />)
 

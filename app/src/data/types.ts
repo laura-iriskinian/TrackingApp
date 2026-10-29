@@ -7,6 +7,8 @@ export type Muscle =
 
 export type ExerciseKind = 'strength' | 'cardio'
 
+export type Equipment = 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight'
+
 export interface Exercise {
   id: string
   name: string
@@ -14,6 +16,7 @@ export interface Exercise {
   group: string
   primary: Muscle[]
   secondary: Muscle[]
+  equipment?: Equipment // absent pour le cardio et les exercices créés par l'utilisateur
   custom?: boolean
 }
 
@@ -38,6 +41,7 @@ export interface SetLog {
 export interface Entry {
   exerciseId: string
   group?: string // exercices enchaînés en superset ou circuit : même valeur, à la suite dans la séance
+  target?: string // répétitions visées, reprises du planning
   sets: SetLog[]
 }
 
@@ -80,6 +84,7 @@ export interface PlanItem {
   sets?: number
   types?: (SetType | null)[] // type de chaque série prévue, null = normale
   group?: string
+  target?: string // répétitions visées, en clair : « 8-12 », « 30 s »
 }
 
 export interface Plan {
@@ -100,8 +105,17 @@ export interface Goal {
   updatedAt: number
 }
 
+export type TrainingGoal = 'muscle' | 'fit' | 'loss'
+export type Level = 'beginner' | 'trained'
+export type Place = 'gym' | 'home'
+
 export interface Profile {
   name?: string
+  goal?: TrainingGoal // objectif choisi au premier lancement
+  level?: Level
+  place?: Place
+  program?: string // programme tout prêt appliqué au planning
+  onboarded?: boolean // false : premier lancement à refaire
   age?: number
   heightCm?: number
   sex?: 'f' | 'h'

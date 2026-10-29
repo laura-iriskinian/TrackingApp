@@ -8,6 +8,11 @@ import { measureSeries } from '../lib/records'
 import { LineChart } from '../components/LineChart'
 import { ConfirmSheet, useToast } from '../components/ui'
 
+const PREV_KEY = 'nextrep-body-prev'
+
+// « −4,2 kg », « +1 cm », « stable »
+const gap = (d: number, unit: string) => (d === 0 ? 'stable' : (d > 0 ? '+' : '−') + fmtNum(Math.abs(d)) + ' ' + unit)
+
 const toNum = (v: string) => {
   const n = parseFloat(v.replace(',', '.'))
   return Number.isFinite(n) && n > 0 && n < 1000 ? n : undefined
@@ -21,11 +26,18 @@ export function Body() {
   const [kind, setKind] = useState('weight')
   const [sheet, setSheet] = useState<'add' | 'kind' | 'del-kind' | null>(null)
   const toast = useToast()
+  // L'écart avec la mesure d'avant est facultatif, l'écart depuis le début est toujours affiché
+  const [showPrev, setShowPrev] = useState(() => { try { return localStorage.getItem(PREV_KEY) === '1' } catch { return false } })
+  const togglePrev = () => {
+    setShowPrev(!showPrev)
+    try { localStorage.setItem(PREV_KEY, showPrev ? '0' : '1') } catch { /* stockage indisponible : réglage non retenu */ }
+  }
   if (!measures) return null
 
   const k = kinds.find(x => x.id === kind) ?? kinds[0]
   const pts = measureSeries(measures, k.id)
-  const last = pts[pts.length - 1], prev = pts[pts.length - 2]
+  const first = pts[0], last = pts[pts.length - 1], prev = pts[pts.length - 2]
+  const since = first && last && pts.length > 1 ? +(last.y - first.y).toFixed(1) : null
   const diff = last && prev ? +(last.y - prev.y).toFixed(1) : null
 
   const removeValue = async (date: string) => {
@@ -49,10 +61,16 @@ export function Body() {
           <div>
             <span className="sub">{k.name}{last ? ' · ' + longDate(last.x).toLowerCase() : ''}</span>
             <span className="big">{last ? fmtNum(last.y) : '—'}<span className="unit">{k.unit}</span></span>
-            {diff != null && <span className="data">{diff === 0 ? 'stable' : (diff > 0 ? '+' : '−') + fmtNum(Math.abs(diff)) + ' ' + k.unit} depuis la mesure d'avant</span>}
+            {since != null && <span className="data"><b className="body-since">{gap(since, k.unit)}</b> depuis le début ({longDate(first.x).toLowerCase()})</span>}
+            {showPrev && diff != null && <span className="data">{gap(diff, k.unit)} depuis la mesure d'avant</span>}
           </div>
         </div>
         <LineChart points={pts} unit={k.unit} label={`${k.name}, mesure par mesure`} />
+        {pts.length > 1 && (
+          <button className="link body-prev" aria-pressed={showPrev} onClick={togglePrev}>
+            {showPrev ? 'Masquer l\'écart avec la mesure d\'avant' : 'Afficher l\'écart avec la mesure d\'avant'}
+          </button>
+        )}
         <button className="btn" onClick={() => setSheet('add')}>Noter une mesure</button>
       </section>
 
@@ -60,10 +78,11 @@ export function Body() {
         <section className="card">
           <h2>Dernières mesures</h2>
           <div className="list">
-            {[...pts].reverse().slice(0, 10).map(p => (
+            {[...pts].reverse().slice(0, 10).map((p, i, list) => (
               <div key={p.x} className="li">
                 <span>{longDate(p.x)}</span>
                 <span className="m-val">
+                  {showPrev && list[i + 1] && <span className="data">{gap(+(p.y - list[i + 1].y).toFixed(1), k.unit)}</span>}
                   <b className="data">{fmtNum(p.y)} {k.unit}</b>
                   <button className="link edit-del" aria-label={`Supprimer la mesure du ${longDate(p.x).toLowerCase()}`} onClick={() => removeValue(p.x)}>×</button>
                 </span>

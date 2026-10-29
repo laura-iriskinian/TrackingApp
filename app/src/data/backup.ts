@@ -1,6 +1,6 @@
 // Restauration d'une sauvegarde NextRep. Le fichier vient de l'extérieur : on ne garde que des champs connus,
 // avec le bon type et des valeurs plausibles, pour qu'un fichier abîmé ou piégé ne puisse rien glisser d'autre.
-import { db, DATA_TABLES } from './db'
+import { db, DATA_TABLES, mergeIntoCatalog } from './db'
 import { migrateEntries, migrateItems, SET_TYPES } from './sets'
 import type {
   Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetType, Workout,
@@ -42,7 +42,7 @@ function entry(v: unknown): (Entry & { technique?: string }) | undefined {
   if (!isObj(v) || !id(v.exerciseId)) return
   const sets = list(v.sets, 100)?.map(setLog)
   if (!sets || sets.some(s => !s)) return
-  return pick({ exerciseId: id(v.exerciseId)!, group: id(v.group), technique: str(v.technique, 40), sets: sets as SetLog[] })
+  return pick({ exerciseId: id(v.exerciseId)!, group: id(v.group), target: str(v.target, 20), technique: str(v.technique, 40), sets: sets as SetLog[] })
 }
 
 const ROWS = {
@@ -81,7 +81,7 @@ const ROWS = {
     const items = list(v.items, 50)?.map((x): (PlanItem & { technique?: string }) | undefined => {
       if (!isObj(x) || !id(x.exerciseId)) return
       const types = list(x.types, 50)?.map(t => (t === null ? null : oneOf(t, SET_TYPE_IDS) ?? null)) as (SetType | null)[] | undefined
-      return pick({ exerciseId: id(x.exerciseId)!, sets: num(x.sets, 1, 50), types, group: id(x.group), technique: str(x.technique, 40) })
+      return pick({ exerciseId: id(x.exerciseId)!, sets: num(x.sets, 1, 50), types, group: id(x.group), target: str(x.target, 20), technique: str(x.technique, 40) })
     })
     if (weekday == null || !Number.isInteger(weekday) || !items || items.some(x => !x)) return
     return { weekday, title: str(v.title, 100) ?? '', items: migrateItems(items as PlanItem[]), updatedAt: time(v.updatedAt) }
@@ -116,7 +116,9 @@ const ROWS = {
     if (v.key === 'profile' && isObj(v.value)) {
       const p = v.value, nt = isObj(p.nutritionTargets) ? p.nutritionTargets : {}
       const value: Partial<Profile> = pick({
-        name: str(p.name, 40), age: num(p.age, 1, 120), heightCm: num(p.heightCm, 50, 260), sex: oneOf(p.sex, ['f', 'h'] as const),
+        name: str(p.name, 40), goal: oneOf(p.goal, ['muscle', 'fit', 'loss'] as const), level: oneOf(p.level, ['beginner', 'trained'] as const),
+        place: oneOf(p.place, ['gym', 'home'] as const), program: id(p.program), onboarded: typeof p.onboarded === 'boolean' ? p.onboarded : undefined,
+        age: num(p.age, 1, 120), heightCm: num(p.heightCm, 50, 260), sex: oneOf(p.sex, ['f', 'h'] as const),
         weekStart: num(p.weekStart, 0, 6), restSec: num(p.restSec, 0, 1800), effortMode: oneOf(p.effortMode, ['off', 'simple', 'rpe', 'rir'] as const),
         barKg: num(p.barKg, 0, 50), weeklyTarget: num(p.weeklyTarget, 1, 14),
         plates: list(p.plates, 20)?.filter((x): x is number => num(x, 0.1, 50) != null),
@@ -186,5 +188,6 @@ export async function restoreBackup(b: CheckedBackup) {
     await db.exercises.bulkPut(b.rows.exercises)
     await db.notes.bulkPut(b.rows.notes)
     await db.kv.bulkPut(b.rows.kv)
+    await mergeIntoCatalog(n => db.table(n))
   })
 }

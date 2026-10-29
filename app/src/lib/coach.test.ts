@@ -34,7 +34,10 @@ describe('échauffement, remplacement, disques', () => {
     const alt = alternatives(ex('developpe-couche'), CATALOG)
     expect(alt[0].primary).toContain('pecs')
     expect(alt.every(e => e.primary.includes('pecs') || e.primary.includes('triceps') || e.primary.includes('delts'))).toBe(true)
-    expect(alternatives(ex('course'), CATALOG).map(e => e.id)).toEqual(['marche'])
+    const run = alternatives(ex('course'), CATALOG).map(e => e.id)
+    expect(run[0]).toBe('marche')
+    expect(run).toContain('velo')
+    expect(run.every(id => ex(id).kind === 'cardio')).toBe(true)
   })
   it('calcule les disques de chaque côté', () => {
     expect(platesFor(100, 20, [25, 20, 15, 10, 5, 2.5, 1.25])).toEqual({ side: [25, 15], rest: 0 })

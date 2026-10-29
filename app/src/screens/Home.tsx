@@ -3,8 +3,7 @@ import { useMemo, useState } from 'react'
 import { allExercises, db, getProfile, saveProfile } from '../data/db'
 import { importLegacy, legacySummary } from '../data/legacy'
 import { addDays, DAYS, fmtThousands, longDate, parse, today, weekday, weekStartOf } from '../lib/dates'
-import { musclesOf, volume } from '../lib/summary'
-import { typesSummary } from '../data/sets'
+import { musclesOf, planLine, volume } from '../lib/summary'
 import { MUSCLE_LABEL } from '../data/exercises'
 import type { Muscle } from '../data/types'
 import { recovery } from '../lib/recovery'
@@ -12,7 +11,7 @@ import { streak } from '../lib/streak'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
 import { getSession, startSession } from '../data/session'
-import { openPlanning, openSession } from '../lib/nav'
+import { openPlanning, openPrograms, openSession } from '../lib/nav'
 import './Home.css'
 
 export function Home() {
@@ -127,7 +126,7 @@ export function Home() {
               {plan.items.map((it, i) => (
                 <li key={i}>
                   <span>{exById(it.exerciseId)?.name ?? 'Exercice'}</span>
-                  <span className="data">{[it.sets || it.types?.length ? (it.sets || it.types!.length) + ' séries' : '', typesSummary(it.types ?? []), it.group ? 'superset' : ''].filter(Boolean).join(' · ')}</span>
+                  <span className="data">{planLine(it, exById(it.exerciseId))}</span>
                 </li>
               ))}
             </ol>
@@ -140,6 +139,7 @@ export function Home() {
           <span className="eyebrow">Séance du jour</span>
           <h2>Pas de séance prévue</h2>
           <p className="sub">Profite du repos, ou entraîne-toi librement.</p>
+          {!plans.some(p => p.items.length) && <button className="link plan-link" onClick={openPrograms}>Choisir un programme tout prêt</button>}
           {!active && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
           <button className="link plan-link" onClick={openPlanning}>Préparer le planning de la semaine</button>
         </section>

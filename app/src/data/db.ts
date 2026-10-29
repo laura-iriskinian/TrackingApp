@@ -1,6 +1,6 @@
-import Dexie, { type EntityTable } from 'dexie'
-import type { Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Plan, Profile, Workout } from './types'
-import { CATALOG } from './exercises'
+import Dexie, { type EntityTable, type Table } from 'dexie'
+import type { Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Plan, Profile, Workout } from './types'
+import { CATALOG, norm } from './exercises'
 import { migrateEntries, migrateItems } from './sets'
 
 export const db = new Dexie('nextrep') as Dexie & {
@@ -35,6 +35,37 @@ db.version(2).stores({ notes: 'exerciseId' }).upgrade(async tx => {
     if (v?.entries) v.entries = migrateEntries(v.entries)
   })
 })
+
+// Version 3 : catalogue élargi. Un exercice créé par l'utilisateur qui porte le nom d'un nouvel exercice
+// du catalogue est fusionné avec lui, pour garder un seul historique.
+db.version(3).stores({}).upgrade(tx => mergeIntoCatalog(n => tx.table(n)))
+
+export async function mergeIntoCatalog(table: (name: string) => Table) {
+  const map = new Map<string, string>()
+  for (const e of (await table('exercises').toArray()) as Exercise[]) {
+    const known = CATALOG.find(c => norm(c.name) === norm(e.name))
+    if (known) map.set(e.id, known.id)
+  }
+  if (!map.size) return
+  const re = (id: string) => map.get(id) ?? id
+  const fix = (entries: Entry[]) => entries.forEach(e => { e.exerciseId = re(e.exerciseId) })
+  await table('workouts').toCollection().modify((w: Workout) => { fix(w.entries); w.exerciseIds = [...new Set(w.entries.map(e => e.exerciseId))] })
+  await table('plans').toCollection().modify((p: Plan) => { p.items.forEach(i => { i.exerciseId = re(i.exerciseId) }) })
+  await table('goals').toCollection().modify((g: Goal) => {
+    const [type, id] = [g.metric.split(':')[0], g.metric.slice(g.metric.indexOf(':') + 1)]
+    if (type === 'max-weight') g.metric = type + ':' + re(id)
+  })
+  await table('kv').where('key').equals('session').modify((r: KV) => {
+    const v = r.value as { entries?: Entry[] }
+    if (v?.entries) fix(v.entries)
+  })
+  for (const [from, to] of map) {
+    const note = (await table('notes').get(from)) as ExerciseNote | undefined
+    if (note && !(await table('notes').get(to))) await table('notes').put({ ...note, exerciseId: to })
+    await table('notes').delete(from)
+  }
+  await table('exercises').bulkDelete([...map.keys()])
+}
 
 export const DATA_TABLES = [db.workouts, db.measures, db.measureKinds, db.foods, db.plans, db.goals, db.exercises, db.notes, db.kv]
 

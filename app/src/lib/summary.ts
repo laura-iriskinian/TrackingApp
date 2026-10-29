@@ -1,6 +1,6 @@
-import type { Entry, Exercise, Muscle, SetLog } from '../data/types'
+import type { Entry, Exercise, Muscle, PlanItem, SetLog } from '../data/types'
 import { fmtNum } from './dates'
-import { isWork, typeShort } from '../data/sets'
+import { isWork, typeShort, typesSummary } from '../data/sets'
 
 const pace = (min: number, km: number) => {
   let m = Math.floor(min / km), s = Math.round((min / km - m) * 60)
@@ -37,4 +37,15 @@ export function musclesOf(list: (Exercise | undefined)[]) {
     e?.secondary.forEach(m => secondary.add(m))
   }
   return { primary: [...primary], secondary: [...secondary].filter(m => !primary.has(m)) }
+}
+
+// Répétitions visées : « 8-12 » s'affiche « 8–12 »
+export const fmtTarget = (t: string) => t.replace(/(\d)\s*-\s*(\d)/, '$1–$2')
+
+// Ligne d'un exercice prévu : « 3 × 8–12 · 1 échauffement · superset », « 20 min » pour le cardio
+export function planLine(it: PlanItem, ex?: Exercise): string {
+  const n = it.sets || it.types?.length || 0
+  const t = it.target ? fmtTarget(it.target) : ''
+  const main = ex?.kind === 'cardio' ? t : n ? (t ? `${n} × ${t}` : `${n} séries`) : ''
+  return [main, typesSummary(it.types ?? []), it.group ? 'enchaîné' : ''].filter(Boolean).join(' · ')
 }

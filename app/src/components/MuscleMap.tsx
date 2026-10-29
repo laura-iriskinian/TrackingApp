@@ -10,12 +10,14 @@ interface Props {
   levels?: Partial<Record<Muscle, 1 | 2 | 3>> // fatigue, pour la carte de récupération
   className?: string
   label?: string
+  sex?: 'f' | 'h' // pour montrer une silhouette précise, sinon celle du profil
 }
 
 // Silhouette anatomique grise, muscles principaux en orange vif, secondaires en orange clair.
 // La silhouette (femme ou homme) suit le choix fait dans le profil.
-export function MuscleMap({ view, primary = [], secondary = [], levels, className, label }: Props) {
-  const sex = useLiveQuery(async () => (await getProfile()).sex) === 'f' ? 'f' : 'h'
+export function MuscleMap({ view, primary = [], secondary = [], levels, className, label, sex: forced }: Props) {
+  const own = useLiveQuery(async () => (await getProfile()).sex) === 'f' ? 'f' : 'h'
+  const sex = forced ?? own
   const fig = ANATOMY[sex][view]
   const cls = (k: string) =>
     k === '-' ? 'b'

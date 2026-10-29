@@ -3,7 +3,7 @@ import { allExercises, db } from '../data/db'
 import { longDate, MONTHS, parse } from '../lib/dates'
 import { entrySummary } from '../lib/summary'
 import { getSession, startSession } from '../data/session'
-import { openPlanning, openSession, openTimer, openWorkoutEdit } from '../lib/nav'
+import { openExercises, openPlanning, openPrograms, openSession, openTimer, openWorkoutEdit } from '../lib/nav'
 
 export function Workouts() {
   const workouts = useLiveQuery(() => db.workouts.orderBy('date').reverse().toArray())
@@ -32,6 +32,10 @@ export function Workouts() {
       </header>
       <button className="btn go" onClick={start}>{active ? 'Reprendre la séance en cours' : 'Nouvelle séance'}</button>
       <button className="btn soft" onClick={() => openWorkoutEdit()}>Ajouter une séance passée</button>
+      <div className="row">
+        <button className="btn soft" onClick={openPrograms}>Programmes</button>
+        <button className="btn soft" onClick={openExercises}>Exercices</button>
+      </div>
 
       {workouts && !workouts.length && (
         <section className="card">

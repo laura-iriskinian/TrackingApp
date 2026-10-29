@@ -12,9 +12,10 @@ import { PlatesSheet } from '../components/Plates'
 import type { Entry, Exercise, Profile, SetLog, SetType, Workout } from '../data/types'
 import { fmtNum, fmtThousands } from '../lib/dates'
 import { keepAwake, restOver, unlockAudio } from '../lib/signal'
-import { entrySummary, musclesOf, volume } from '../lib/summary'
+import { entrySummary, fmtTarget, musclesOf, volume } from '../lib/summary'
 import { e1rm, recordBeaten, setsOf } from '../lib/records'
 import { ExercisePicker } from '../components/ExercisePicker'
+import { ExerciseSheet } from '../components/ExerciseSheet'
 import { MuscleMap } from '../components/MuscleMap'
 import { ConfirmSheet, useToast } from '../components/ui'
 import './Session.css'
@@ -39,7 +40,7 @@ const toNum = (v: string) => {
   return Number.isFinite(n) && n >= 0 ? n : undefined
 }
 
-type Sheet = 'add' | 'finish' | 'quit' | 'replace' | 'replace-all' | 'plates' | null
+type Sheet = 'add' | 'finish' | 'quit' | 'replace' | 'replace-all' | 'plates' | 'guide' | null
 
 export function Session({ onClose }: { onClose: () => void }) {
   const s = useLiveQuery(getSession, [], null)
@@ -136,7 +137,7 @@ export function Session({ onClose }: { onClose: () => void }) {
     if (!cur) return
     const ei = cur.cur, e = cur.entries[ei]
     const done = e.sets.filter(x => x.done), todo = e.sets.length - done.length
-    const fresh = buildEntry(picked, await lastSets(picked.id), { sets: todo || undefined, group: e.group })
+    const fresh = buildEntry(picked, await lastSets(picked.id), { sets: todo || undefined, group: e.group, target: e.target })
     const entries = [...cur.entries]
     entries.splice(ei, 1, ...(done.length ? [{ ...e, sets: done }, fresh] : [fresh]))
     await saveSession({ ...cur, entries, cur: done.length ? ei + 1 : ei })
@@ -177,7 +178,7 @@ export function Session({ onClose }: { onClose: () => void }) {
       {entry && ex ? (
         <Current key={s.id + s.cur + entry.exerciseId} s={s} entry={entry} ex={ex} effortMode={profile?.effortMode ?? 'off'}
           barKg={profile?.barKg ?? 20} onValidate={validate} onPatch={fn => patchEntry(s.cur, fn)} onLink={link}
-          onReplace={() => setSheet('replace')} onPlates={w => { setPlatesWeight(w); setSheet('plates') }} />
+          onReplace={() => setSheet('replace')} onGuide={() => setSheet('guide')} onPlates={w => { setPlatesWeight(w); setSheet('plates') }} />
       ) : (
         <section className="card">
           <h2>Ta séance est vide</h2>
@@ -219,6 +220,7 @@ export function Session({ onClose }: { onClose: () => void }) {
       {sheet === 'replace-all' && (
         <ExercisePicker exercises={exercises} exclude={s.entries.map(e => e.exerciseId)} onPick={replace} onClose={() => setSheet(null)} />
       )}
+      {sheet === 'guide' && ex && <ExerciseSheet ex={ex} onClose={() => setSheet(null)} />}
       {sheet === 'plates' && <PlatesSheet weight={platesWeight} onClose={() => setSheet(null)} />}
       {sheet === 'finish' && (
         <ConfirmSheet title="Terminer la séance ?"
@@ -245,9 +247,9 @@ function nextLabel(s: ActiveSession, exById: (id: string) => Exercise | undefine
 }
 
 // Exercice affiché : séries faites, série en cours à saisir, séries à venir
-function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink, onReplace, onPlates }: {
+function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink, onReplace, onGuide, onPlates }: {
   s: ActiveSession; entry: Entry; ex: Exercise; effortMode: Profile['effortMode']; barKg: number
-  onReplace: () => void; onPlates: (weight?: number) => void
+  onReplace: () => void; onGuide: () => void; onPlates: (weight?: number) => void
   onValidate: (ei: number, si: number, v: Omit<SetLog, 'done'>) => void
   onPatch: (fn: (e: Entry) => Entry | null) => void
   onLink: (link: boolean) => void
@@ -296,6 +298,7 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
           <span className="sub">
             {last?.length ? 'La dernière fois : ' + entrySummary({ exerciseId: ex.id, sets: last }, ex) : 'Première fois : note ce que tu fais, on s\'en souviendra.'}
           </span>
+          {entry.target && <span className="sub target">Objectif : {fmtTarget(entry.target)}{cardio ? '' : /^\d+(\s*-\s*\d+)?$/.test(entry.target) ? ' répétitions par série' : ' par série'}</span>}
         </div>
         {hasMap && (
           <div className="cur-figs">
@@ -368,6 +371,7 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
       )}
 
       <div className="row cur-tools">
+        {!ex.custom && <button className="link" onClick={onGuide}>Comment faire</button>}
         <button className="link" onClick={() => onPatch(e => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? {}), feel: undefined, rpe: undefined, rir: undefined, done: false }] }))}>+ Série</button>
         {entry.sets.some(x => !x.done) && entry.sets.length > 1 && (
           <button className="link" onClick={() => onPatch(e => {

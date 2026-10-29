@@ -7,6 +7,9 @@ import { newGroupId, SET_TYPES } from '../data/sets'
 import type { Exercise, Plan, PlanItem, SetType } from '../data/types'
 import { DAYS, today, weekday } from '../lib/dates'
 import { ExercisePicker } from '../components/ExercisePicker'
+import { ExerciseSheet } from '../components/ExerciseSheet'
+import { PROGRAMS } from '../data/programs'
+import { openPrograms } from '../lib/nav'
 import './Session.css'
 
 const DEFAULT_SETS = 3
@@ -26,6 +29,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
   const plans = useLiveQuery(() => db.plans.toArray())
   const exercises = useLiveQuery(allExercises) ?? []
   const [picking, setPicking] = useState(false)
+  const [info, setInfo] = useState<Exercise | null>(null)
   const profile = useLiveQuery(getProfile)
   if (!plans || !profile) return null
 
@@ -79,6 +83,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
+  const program = PROGRAMS.find(p => p.id === profile.program)
   const count = (d: number) => plans.find(p => p.weekday === d)?.items.length ?? 0
 
   return (
@@ -90,6 +95,10 @@ export function Planning({ onClose }: { onClose: () => void }) {
         <h1>Planning</h1>
         <span className="sub">Tes séances prévues pour chaque jour de la semaine.</span>
       </div>
+      <button className="suggest" onClick={openPrograms}>
+        <b>{program ? `Programme : ${program.name}` : 'Programmes tout prêts'}</b>
+        <span>{program ? 'Changer de programme, ou modifier les séances ci-dessous.' : 'Remplis ta semaine en un geste, selon ton objectif et ton niveau.'}</span>
+      </button>
 
       <div className="seg days" role="tablist" aria-label="Jour de la semaine">
         {DAYS.map((d, i) => (
@@ -124,6 +133,16 @@ export function Planning({ onClose }: { onClose: () => void }) {
                 <button className="link" disabled={i === plan.items.length - 1} aria-label="Descendre" onClick={() => move(i, 1)}>↓</button>
               </div>
             </div>
+            <div className="plan-sets">
+              <label className="sub" htmlFor={`pl-tg-${i}`}>{cardio ? 'Objectif' : 'Répétitions visées'}</label>
+              <input id={`pl-tg-${i}`} key={day + '-' + i + '-' + it.exerciseId} className="input plan-target" maxLength={20}
+                defaultValue={it.target ?? ''} placeholder={cardio ? '20 min' : '8-12'}
+                onChange={e => patchItem(i, x => {
+                  const target = e.target.value.trim()
+                  const { target: _, ...rest } = x
+                  return target ? { ...rest, target } : rest
+                })} />
+            </div>
             {!cardio && (
               <>
                 <div className="plan-sets">
@@ -156,6 +175,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
               {it.group
                 ? <button className="link" onClick={() => link(i, false)}>Ne plus enchaîner</button>
                 : i < plan.items.length - 1 && <button className="link" onClick={() => link(i, true)}>Enchaîner avec le suivant</button>}
+              {ex && !ex.custom && <button className="link" onClick={() => setInfo(ex)}>Fiche</button>}
               <button className="link" onClick={() => patchItem(i, () => null)}>Retirer</button>
             </div>
           </section>
@@ -182,6 +202,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
         <button className="btn soft" disabled={!planned.length} onClick={exportReminders}>Ajouter à mon agenda</button>
       </section>
 
+      {info && <ExerciseSheet ex={info} onClose={() => setInfo(null)} />}
       {picking && (
         <ExercisePicker exercises={exercises} exclude={plan.items.map(x => x.exerciseId)} onPick={add} onClose={() => setPicking(false)} />
       )}
