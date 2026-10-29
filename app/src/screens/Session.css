@@ -157,3 +157,19 @@
 .timer-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .timer-fields input:disabled, .timer-fields button:disabled { opacity: .45; }
 .timer-note { padding: 0 4px; line-height: 1.5; }
+
+/* Progression suggérée et disques */
+.suggest {
+  border: 0; text-align: left; border-radius: var(--r-md); padding: 11px 14px; display: grid; gap: 2px;
+  background: var(--paper); box-shadow: inset 3px 0 0 var(--effort);
+}
+.suggest b { font: 700 1rem var(--f-display); }
+.suggest span { font-size: .8rem; color: var(--mute); }
+.chips.wrap { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+.plates-out { display: grid; gap: 8px; justify-items: start; min-height: 120px; }
+.plates-bar { display: flex; align-items: center; gap: 3px; min-height: 100px; }
+.plates-bar .sleeve { width: 46px; height: 12px; background: var(--muscle); border-radius: 3px; }
+.plates-bar b {
+  width: 26px; border-radius: 5px; background: var(--ink); color: var(--paper); display: grid; place-items: center;
+  font: 600 .62rem var(--f-data); writing-mode: vertical-rl; transform: rotate(180deg);
+}

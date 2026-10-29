@@ -44,3 +44,12 @@ describe('records et progression', () => {
     expect(progress(m, 62)).toBe(.5)
   })
 })
+
+describe('affichage des nombres', () => {
+  it('sépare les milliers, même à 4 chiffres', async () => {
+    const { fmtThousands } = await import('./dates')
+    expect(fmtThousands(1260)).toBe('1 260')
+    expect(fmtThousands(12600.4)).toBe('12 600')
+    expect(fmtThousands(950)).toBe('950')
+  })
+})

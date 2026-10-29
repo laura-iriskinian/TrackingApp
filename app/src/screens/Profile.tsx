@@ -9,7 +9,7 @@ import { applyTheme, type Theme } from '../lib/theme'
 import { ConfirmSheet, useToast } from '../components/ui'
 import { Mark } from '../components/Logo'
 
-type Sheet = 'legacy' | 'erase' | 'restore' | null
+type Sheet = 'legacy' | 'erase' | 'restore' | 'paste' | null
 
 export function Profile() {
   const profile = useLiveQuery(getProfile)
@@ -48,9 +48,12 @@ export function Profile() {
 
   const openBackup = async (file?: File) => {
     if (!file) return
+    if (file.size > MAX_BACKUP_BYTES) { toast('Ce fichier est trop gros pour être une sauvegarde.'); return }
+    openText(await file.text())
+  }
+  const openText = (text: string) => {
     try {
-      if (file.size > MAX_BACKUP_BYTES) throw new Error('Ce fichier est trop gros pour être une sauvegarde NextRep.')
-      setBackup(checkBackup(await file.text()))
+      setBackup(checkBackup(text.trim()))
       setSheet('restore')
     } catch (e) {
       toast((e as Error).message)
@@ -73,6 +76,14 @@ export function Profile() {
           <div className="seg" role="group" aria-labelledby="sx-l">
             {([['f', 'Femme'], ['h', 'Homme']] as const).map(([v, l]) => (
               <button key={v} aria-pressed={(profile?.sex ?? 'h') === v} onClick={() => saveProfile({ sex: v })}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span className="sub" id="wt-l">Objectif de séances par semaine</span>
+          <div className="seg" role="group" aria-labelledby="wt-l">
+            {[1, 2, 3, 4, 5, 6].map(n => (
+              <button key={n} aria-pressed={(profile?.weeklyTarget ?? 3) === n} onClick={() => saveProfile({ weeklyTarget: n })}>{n}</button>
             ))}
           </div>
         </div>
@@ -106,8 +117,9 @@ export function Profile() {
         <button className="btn" onClick={exportData}>Exporter une sauvegarde</button>
         <label className="btn soft file-btn">
           Restaurer une sauvegarde
-          <input type="file" accept="application/json,.json" onChange={e => { openBackup(e.target.files?.[0]); e.target.value = '' }} />
+          <input type="file" accept="application/json,text/plain,.json,.txt" onChange={e => { openBackup(e.target.files?.[0]); e.target.value = '' }} />
         </label>
+        <p className="data">Fonctionne aussi avec une sauvegarde de Suivi sport. <button className="link inline-link" onClick={() => setSheet('paste')}>Coller le texte d'une sauvegarde</button></p>
         {legacy && (
           <button className="btn soft" onClick={() => setSheet('legacy')}>
             {imported ? 'Récupérer à nouveau depuis Suivi sport' : 'Récupérer mes données de Suivi sport'}
@@ -135,11 +147,12 @@ export function Profile() {
           }}
         />
       )}
+      {sheet === 'paste' && <PasteSheet onClose={() => setSheet(null)} onText={openText} />}
       {sheet === 'restore' && backup && (
         <ConfirmSheet
           danger
           title="Restaurer cette sauvegarde ?"
-          text={`Sauvegarde${backup.exportedAt ? ' du ' + longDate(backup.exportedAt.slice(0, 10)).toLowerCase() : ''} : ${nb(backup.rows.workouts.length, 'séance')} et ${nb(backup.rows.measures.length, 'mesure')}. `
+          text={(backup.source === 'suivi-sport' ? 'Sauvegarde de Suivi sport' : `Sauvegarde${backup.exportedAt ? ' du ' + longDate(backup.exportedAt.slice(0, 10)).toLowerCase() : ''}`) + ` : ${nb(backup.rows.workouts.length, 'séance')} et ${nb(backup.rows.measures.length, 'mesure')}. `
             + `Elle remplacera toutes les données actuelles de ${APP_NAME} (${nb(counts?.workouts ?? 0, 'séance')}).`
             + (backup.skipped ? ` ${backup.skipped} élément${backup.skipped > 1 ? 's' : ''} illisible${backup.skipped > 1 ? 's' : ''} ser${backup.skipped > 1 ? 'ont' : 'a'} ignoré${backup.skipped > 1 ? 's' : ''}.` : '')}
           confirmLabel="Restaurer"
@@ -161,7 +174,23 @@ export function Profile() {
           onConfirm={async () => { await eraseAll(); pickTheme('auto'); setSheet(null); toast('Toutes tes données ont été supprimées') }}
         />
       )}
-      <style>{'.file-btn{position:relative;text-align:center;cursor:pointer}.file-btn input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.file-btn:focus-within{outline:2px solid var(--effort);outline-offset:3px}.about{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:.8rem;padding:8px 0}'}</style>
+      <style>{'.file-btn{position:relative;text-align:center;cursor:pointer}.file-btn input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.file-btn:focus-within{outline:2px solid var(--effort);outline-offset:3px}.inline-link{padding:0;font:inherit;color:var(--ink);text-decoration:underline}.paste{min-height:140px;font:500 .8rem var(--f-data);resize:vertical}.about{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:.8rem;padding:8px 0}'}</style>
+    </div>
+  )
+}
+
+// Pour une sauvegarde de Suivi sport copiée dans une note plutôt qu'enregistrée en fichier
+function PasteSheet({ onText, onClose }: { onText: (t: string) => void; onClose: () => void }) {
+  const [text, setText] = useState('')
+  return (
+    <div className="veil" onClick={onClose}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="ps-t" onClick={e => e.stopPropagation()}>
+        <h2 id="ps-t">Coller une sauvegarde</h2>
+        <p>Colle ici le texte copié depuis Suivi sport ou NextRep.</p>
+        <textarea className="input paste" autoFocus value={text} onChange={e => setText(e.target.value)} aria-label="Texte de la sauvegarde" />
+        <button className="btn" disabled={!text.trim()} onClick={() => onText(text)}>Continuer</button>
+        <button className="btn soft" onClick={onClose}>Annuler</button>
+      </div>
     </div>
   )
 }

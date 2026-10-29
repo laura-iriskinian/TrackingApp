@@ -27,7 +27,8 @@ export const longDate = (s: string) => {
 }
 
 export const fmtNum = (n: number) => String(+n.toFixed(2)).replace('.', ',')
-export const fmtThousands = (n: number) => Math.round(n).toLocaleString('fr-FR')
+// Groupé à la main : en français, le navigateur ne sépare pas les nombres à 4 chiffres (« 1260 »)
+export const fmtThousands = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f')
 
 // « 1 séance », « 3 séances »
 export const nb = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`

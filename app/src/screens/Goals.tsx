@@ -27,8 +27,9 @@ function describe(g: Goal, exercises: Exercise[], kinds: MeasureKind[]) {
 // Objectifs à atteindre avant une date, avec leur avancement
 export function Goals() {
   const goals = useLiveQuery(() => db.goals.toArray())
-  const workouts = useLiveQuery(() => db.workouts.toArray()) ?? []
-  const measures = useLiveQuery(() => db.measures.toArray()) ?? []
+  const ws = useLiveQuery(() => db.workouts.toArray())
+  const ms = useLiveQuery(() => db.measures.toArray())
+  const workouts = ws ?? [], measures = ms ?? []
   const exercises = useLiveQuery(allExercises) ?? []
   const kinds = [...BASE_MEASURES, ...(useLiveQuery(() => db.measureKinds.toArray()) ?? [])]
   const [adding, setAdding] = useState(false)
@@ -36,12 +37,13 @@ export function Goals() {
 
   // Objectif atteint : on garde la date du jour où on l'a vu atteint
   useEffect(() => {
+    if (!ws || !ms) return
     for (const g of goals ?? []) {
-      if (!g.reachedAt && isReached(g, currentValue(g.metric, workouts, measures))) {
+      if (!g.reachedAt && isReached(g, currentValue(g.metric, ws, ms))) {
         db.goals.put({ ...g, reachedAt: today(), updatedAt: Date.now() })
       }
     }
-  }, [goals, workouts, measures])
+  }, [goals, ws, ms])
 
   if (!goals) return null
   const t = today()

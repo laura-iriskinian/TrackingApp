@@ -30,9 +30,10 @@ describe('sauvegarde NextRep', () => {
     expect((await getProfile()).effortMode).toBe('rpe')
   })
 
-  it('refuse ce qui n’est pas une sauvegarde NextRep', () => {
-    expect(() => checkBackup('pas du json')).toThrow('pas une sauvegarde')
-    expect(() => checkBackup(JSON.stringify({ sets: [], body: [] }))).toThrow('pas une sauvegarde')
+  it('refuse ce qui n’est pas une sauvegarde', () => {
+    expect(() => checkBackup('pas du json')).toThrow('ni une sauvegarde')
+    expect(() => checkBackup(JSON.stringify({ sets: 'x', body: [] }))).toThrow('ni une sauvegarde')
+    expect(() => checkBackup(JSON.stringify({ app: 'Autre', data: {} }))).toThrow('ni une sauvegarde')
     expect(() => checkBackup(JSON.stringify({ app: 'NextRep', format: 9, data: {} }))).toThrow('plus récente')
     expect(() => checkBackup(JSON.stringify({ app: 'NextRep', format: 2, data: { workouts: 'x' } }))).toThrow('abîmée')
   })
@@ -64,5 +65,25 @@ describe('sauvegarde NextRep', () => {
     await db.kv.put({ key: 'session', value: { id: 's' } })
     await restoreBackup(checkBackup(JSON.stringify({ app: 'NextRep', format: 2, data: {} })))
     expect(await db.kv.get('session')).toEqual({ key: 'session', value: { id: 's' } })
+  })
+
+  it('restaure un fichier exporté par Suivi sport', async () => {
+    const file = {
+      sets: [{ id: 'a', d: '2026-10-01', ex: 'Squat', w: 60, r: 8, n: 3 }, { id: 'b', d: 'mauvaise date', ex: 'Squat', w: 60, r: 8 }],
+      runs: [{ id: 'r', d: '2026-10-02', type: 'course', km: 5, min: 30 }],
+      body: [{ id: 'm', d: '2026-10-01', bw: 61 }], custom: [], chk: {}, myex: [],
+      plan: { 1: { name: 'Haut', ex: [{ n: 'Tractions', s: 3, t: 'Dégressif' }] } },
+      goals: [{ id: 'g', k: 'ex:Squat', t: 80, by: '2026-12-01', s: 60, dir: 'up' }],
+      prof: { sex: 'f' }, food: [], ng: {},
+    }
+    const b = checkBackup(JSON.stringify(file))
+    expect(b.source).toBe('suivi-sport')
+    expect(b.rows.workouts).toHaveLength(2)
+    await restoreBackup(b)
+    expect((await db.workouts.orderBy('date').first())?.entries[0].sets).toHaveLength(3)
+    expect((await db.plans.get(1))?.items[0].types).toEqual(['drop', 'drop', 'drop'])
+    expect((await db.goals.toArray())[0].metric).toBe('max-weight:squat')
+    expect((await getProfile()).sex).toBe('f')
+    expect(await db.kv.get('legacyImportedAt')).toBeTruthy()
   })
 })

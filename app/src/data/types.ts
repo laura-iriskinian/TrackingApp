@@ -108,6 +108,11 @@ export interface Profile {
   weekStart: number
   restSec: number // repos par défaut entre deux séries
   effortMode: 'off' | 'simple' | 'rpe' | 'rir'
+  barKg: number // poids de la barre, pour le calcul des disques
+  plates: number[] // disques disponibles
+  weeklyTarget: number // objectif de séances par semaine
+  pauseWeeks: string[] // semaines de pause (date du premier jour)
+  reminderTime: string // HH:MM
   nutritionTargets: { kcal: number; protein: number; carbs: number; fat: number }
 }
 

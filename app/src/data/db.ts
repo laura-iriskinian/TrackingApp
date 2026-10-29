@@ -44,6 +44,11 @@ export const DEFAULT_PROFILE: Profile = {
   weekStart: 0,
   restSec: 90,
   effortMode: 'off',
+  barKg: 20,
+  plates: [25, 20, 15, 10, 5, 2.5, 1.25],
+  weeklyTarget: 3,
+  pauseWeeks: [],
+  reminderTime: '18:00',
   nutritionTargets: { kcal: 2000, protein: 100, carbs: 250, fat: 70 },
 }
 

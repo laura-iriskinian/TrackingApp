@@ -6,6 +6,7 @@ import type {
   Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetType, Workout,
 } from './types'
 import { MUSCLE_LABEL } from './exercises'
+import { convertLegacy, isLegacyExport } from './legacy'
 
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024
 const MAX_ROWS = 50000
@@ -117,6 +118,10 @@ const ROWS = {
       const value: Partial<Profile> = pick({
         name: str(p.name, 40), age: num(p.age, 1, 120), heightCm: num(p.heightCm, 50, 260), sex: oneOf(p.sex, ['f', 'h'] as const),
         weekStart: num(p.weekStart, 0, 6), restSec: num(p.restSec, 0, 1800), effortMode: oneOf(p.effortMode, ['off', 'simple', 'rpe', 'rir'] as const),
+        barKg: num(p.barKg, 0, 50), weeklyTarget: num(p.weeklyTarget, 1, 14),
+        plates: list(p.plates, 20)?.filter((x): x is number => num(x, 0.1, 50) != null),
+        pauseWeeks: list(p.pauseWeeks, 1000)?.filter((x): x is string => !!date(x)),
+        reminderTime: typeof p.reminderTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(p.reminderTime) ? p.reminderTime : undefined,
         nutritionTargets: pick({ kcal: num(nt.kcal, 0, 20000), protein: num(nt.protein, 0, 2000), carbs: num(nt.carbs, 0, 2000), fat: num(nt.fat, 0, 2000) }) as Profile['nutritionTargets'],
       })
       return { key: 'profile', value }
@@ -126,6 +131,7 @@ const ROWS = {
 
 type TableName = keyof typeof ROWS
 export interface CheckedBackup {
+  source: 'nextrep' | 'suivi-sport'
   exportedAt?: string
   rows: { [K in TableName]: NonNullable<ReturnType<(typeof ROWS)[K]>>[] }
   skipped: number // lignes écartées car invalides
@@ -133,10 +139,22 @@ export interface CheckedBackup {
 
 // Vérifie le texte d'une sauvegarde. Lève une erreur au message lisible si ce n'en est pas une.
 export function checkBackup(text: string): CheckedBackup {
-  if (text.length > MAX_BACKUP_BYTES) throw new Error('Ce fichier est trop gros pour être une sauvegarde NextRep.')
+  if (text.length > MAX_BACKUP_BYTES) throw new Error('Ce fichier est trop gros pour être une sauvegarde.')
   let raw: unknown
-  try { raw = JSON.parse(text) } catch { throw new Error('Ce fichier n\'est pas une sauvegarde NextRep.') }
-  if (!isObj(raw) || raw.app !== 'NextRep' || !isObj(raw.data)) throw new Error('Ce fichier n\'est pas une sauvegarde NextRep.')
+  try { raw = JSON.parse(text) } catch { throw new Error('Ce fichier n\'est ni une sauvegarde NextRep ni une sauvegarde Suivi sport.') }
+  // Un fichier exporté par Suivi sport est converti, puis vérifié comme une sauvegarde NextRep
+  const legacy = isLegacyExport(raw)
+  if (legacy) {
+    const c = convertLegacy(raw as Obj)
+    raw = {
+      app: 'NextRep', format: 2, data: {
+        workouts: c.workouts, measures: c.measures, measureKinds: c.kinds, foods: c.foods, plans: c.plans,
+        goals: c.goals, exercises: c.custom,
+        kv: [{ key: 'profile', value: c.profile }, { key: 'legacyImportedAt', value: new Date().toISOString() }],
+      },
+    }
+  }
+  if (!isObj(raw) || raw.app !== 'NextRep' || !isObj(raw.data)) throw new Error('Ce fichier n\'est ni une sauvegarde NextRep ni une sauvegarde Suivi sport.')
   if (raw.format !== 1 && raw.format !== 2) throw new Error('Cette sauvegarde vient d\'une version plus récente de NextRep. Mets l\'app à jour, puis réessaie.')
   let skipped = 0
   const rows = {} as Record<TableName, unknown[]>
@@ -150,7 +168,7 @@ export function checkBackup(text: string): CheckedBackup {
     })
   }
   const exportedAt = typeof raw.exportedAt === 'string' && !isNaN(Date.parse(raw.exportedAt)) ? raw.exportedAt : undefined
-  return { exportedAt, rows: rows as CheckedBackup['rows'], skipped }
+  return { source: legacy ? 'suivi-sport' : 'nextrep', exportedAt, rows: rows as CheckedBackup['rows'], skipped }
 }
 
 // Remplace toutes les données de NextRep par celles de la sauvegarde. Une séance en cours est gardée.

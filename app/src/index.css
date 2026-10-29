@@ -137,6 +137,9 @@ button { cursor: pointer; }
 .m { fill: var(--muscle); transition: fill .3s ease; }
 .m.s { fill: var(--effort-2); }
 .m.p { fill: var(--effort); }
+.m.r1 { fill: var(--effort); fill-opacity: .3; }
+.m.r2 { fill: var(--effort); fill-opacity: .6; }
+.m.r3 { fill: var(--effort); }
 .b { fill: var(--body); }
 .outline { fill: none; stroke: var(--muscle); stroke-width: 1; }
 

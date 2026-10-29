@@ -5,7 +5,10 @@ import {
   buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, groupOf, isFinished, lastSets, nextInRound,
   nextSetIndex, saveSession, type ActiveSession,
 } from '../data/session'
-import { effortLabel, FEELS, newGroupId, SET_TYPES, typeShort } from '../data/sets'
+import { effortLabel, FEELS, isWork, newGroupId, SET_TYPES, typeShort } from '../data/sets'
+import { MUSCLE_LABEL } from '../data/exercises'
+import { alternatives, suggestNext, warmupSets } from '../lib/coach'
+import { PlatesSheet } from '../components/Plates'
 import type { Entry, Exercise, Profile, SetLog, SetType, Workout } from '../data/types'
 import { fmtNum, fmtThousands } from '../lib/dates'
 import { keepAwake, restOver, unlockAudio } from '../lib/signal'
@@ -36,7 +39,7 @@ const toNum = (v: string) => {
   return Number.isFinite(n) && n >= 0 ? n : undefined
 }
 
-type Sheet = 'add' | 'finish' | 'quit' | null
+type Sheet = 'add' | 'finish' | 'quit' | 'replace' | 'replace-all' | 'plates' | null
 
 export function Session({ onClose }: { onClose: () => void }) {
   const s = useLiveQuery(getSession, [], null)
@@ -44,6 +47,7 @@ export function Session({ onClose }: { onClose: () => void }) {
   const profile = useLiveQuery(getProfile)
   const toast = useToast()
   const [sheet, setSheet] = useState<Sheet>(null)
+  const [platesWeight, setPlatesWeight] = useState<number | undefined>()
   const [summary, setSummary] = useState<{ w: Workout; minutes: number } | null>(null)
   const now = useNow(250)
 
@@ -125,6 +129,20 @@ export function Session({ onClose }: { onClose: () => void }) {
     saveSession({ ...s, entries })
   }
 
+  // Remplace l'exercice affiché. Les séries déjà faites restent sur l'ancien exercice.
+  const replace = async (picked: Exercise) => {
+    setSheet(null)
+    const cur = await getSession()
+    if (!cur) return
+    const ei = cur.cur, e = cur.entries[ei]
+    const done = e.sets.filter(x => x.done), todo = e.sets.length - done.length
+    const fresh = buildEntry(picked, await lastSets(picked.id), { sets: todo || undefined, group: e.group })
+    const entries = [...cur.entries]
+    entries.splice(ei, 1, ...(done.length ? [{ ...e, sets: done }, fresh] : [fresh]))
+    await saveSession({ ...cur, entries, cur: done.length ? ei + 1 : ei })
+    toast(`Remplacé par ${picked.name}`)
+  }
+
   const addExercise = async (picked: Exercise) => {
     setSheet(null)
     const e = buildEntry(picked, await lastSets(picked.id))
@@ -158,7 +176,8 @@ export function Session({ onClose }: { onClose: () => void }) {
 
       {entry && ex ? (
         <Current key={s.id + s.cur + entry.exerciseId} s={s} entry={entry} ex={ex} effortMode={profile?.effortMode ?? 'off'}
-          onValidate={validate} onPatch={fn => patchEntry(s.cur, fn)} onLink={link} />
+          barKg={profile?.barKg ?? 20} onValidate={validate} onPatch={fn => patchEntry(s.cur, fn)} onLink={link}
+          onReplace={() => setSheet('replace')} onPlates={w => { setPlatesWeight(w); setSheet('plates') }} />
       ) : (
         <section className="card">
           <h2>Ta séance est vide</h2>
@@ -193,6 +212,14 @@ export function Session({ onClose }: { onClose: () => void }) {
       {sheet === 'add' && (
         <ExercisePicker exercises={exercises} exclude={s.entries.map(e => e.exerciseId)} onPick={addExercise} onClose={() => setSheet(null)} />
       )}
+      {sheet === 'replace' && ex && (
+        <ReplaceSheet ex={ex} options={alternatives(ex, exercises, s.entries.map(e => e.exerciseId))}
+          onPick={replace} onOther={() => setSheet('replace-all')} onClose={() => setSheet(null)} />
+      )}
+      {sheet === 'replace-all' && (
+        <ExercisePicker exercises={exercises} exclude={s.entries.map(e => e.exerciseId)} onPick={replace} onClose={() => setSheet(null)} />
+      )}
+      {sheet === 'plates' && <PlatesSheet weight={platesWeight} onClose={() => setSheet(null)} />}
       {sheet === 'finish' && (
         <ConfirmSheet title="Terminer la séance ?"
           text={done ? `${done} série${done > 1 ? 's' : ''} ser${done > 1 ? 'ont' : 'a'} enregistrée${done > 1 ? 's' : ''}.${done < total ? ' Les séries non validées ne sont pas gardées.' : ''}` : 'Aucune série n\'a été validée : rien ne sera enregistré.'}
@@ -218,8 +245,9 @@ function nextLabel(s: ActiveSession, exById: (id: string) => Exercise | undefine
 }
 
 // Exercice affiché : séries faites, série en cours à saisir, séries à venir
-function Current({ s, entry, ex, effortMode, onValidate, onPatch, onLink }: {
-  s: ActiveSession; entry: Entry; ex: Exercise; effortMode: Profile['effortMode']
+function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink, onReplace, onPlates }: {
+  s: ActiveSession; entry: Entry; ex: Exercise; effortMode: Profile['effortMode']; barKg: number
+  onReplace: () => void; onPlates: (weight?: number) => void
   onValidate: (ei: number, si: number, v: Omit<SetLog, 'done'>) => void
   onPatch: (fn: (e: Entry) => Entry | null) => void
   onLink: (link: boolean) => void
@@ -249,6 +277,12 @@ function Current({ s, entry, ex, effortMode, onValidate, onPatch, onLink }: {
   const canValidate = cardio ? values.km != null || values.min != null : values.reps != null
   const { primary, secondary } = musclesOf([ex])
   const hasMap = primary.length + secondary.length > 0
+  // Progression proposée au début de l'exercice, tant que rien n'a été validé et que la charge n'a pas été changée
+  const started = entry.sets.some(x => x.done && isWork(x))
+  const sug = !cardio && set && isWork(set) && !started && last ? suggestNext(last) : null
+  const showSug = sug && (sug.weight !== values.weight || sug.reps !== values.reps)
+  const workWeight = entry.sets.find(x => isWork(x) && x.weight)?.weight
+  const canWarmup = !cardio && !entry.sets.some(x => x.done || x.type === 'warmup') && workWeight != null && warmupSets(workWeight, barKg).length > 0
   const ei = s.cur
   const group = groupOf(s.entries, ei)
   const linked = group.length > 1
@@ -299,6 +333,17 @@ function Current({ s, entry, ex, effortMode, onValidate, onPatch, onLink }: {
               <button key={t.label} aria-pressed={type === t.id} onClick={() => setType(t.id)}>{t.label}</button>
             ))}
           </div>
+          {showSug && (
+            <button className="suggest" onClick={() => {
+              // Appliquée à toutes les séries de travail prévues avec les mêmes valeurs
+              const from = { weight: set!.weight, reps: set!.reps }
+              onPatch(e => ({ ...e, sets: e.sets.map(x => (!x.done && isWork(x) && x.weight === from.weight && x.reps === from.reps ? { ...x, weight: sug.weight ?? x.weight, reps: sug.reps } : x)) }))
+              setVals(v => ({ ...v, weight: sug.weight != null ? fmtNum(sug.weight) : v.weight, reps: String(sug.reps) }))
+            }}>
+              <b>Essaie {sug.weight != null ? fmtNum(sug.weight) + ' kg × ' + sug.reps : sug.reps + ' répétitions'}</b>
+              <span>Tout réussi la dernière fois, sans aller à la limite. Touche pour l'appliquer.</span>
+            </button>
+          )}
           <div className="steppers">
             {fields.map(f => (
               <div key={f.k} className="stepper">
@@ -330,12 +375,50 @@ function Current({ s, entry, ex, effortMode, onValidate, onPatch, onLink }: {
             return { ...e, sets: e.sets.filter((_, j) => j !== i) }
           })}>− Série</button>
         )}
+        {canWarmup && (
+          <button className="link" onClick={() => onPatch(e => ({ ...e, sets: [...warmupSets(workWeight!, barKg), ...e.sets] }))}>+ Échauffement</button>
+        )}
+        {!cardio && <button className="link" onClick={() => onPlates(values.weight ?? set?.weight)}>Disques</button>}
+        {ex.primary.length > 0 && <button className="link" onClick={onReplace}>Remplacer</button>}
         {linked
           ? <button className="link" onClick={() => onLink(false)}>Ne plus enchaîner</button>
           : ei < s.entries.length - 1 && <button className="link" onClick={() => onLink(true)}>Enchaîner avec le suivant</button>}
         <button className="link" onClick={() => onPatch(() => null)}>Retirer l'exercice</button>
       </div>
     </section>
+  )
+}
+
+// Exercices de remplacement, quand la machine est prise
+function ReplaceSheet({ ex, options, onPick, onOther, onClose }: {
+  ex: Exercise; options: Exercise[]; onPick: (e: Exercise) => void; onOther: () => void; onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    addEventListener('keydown', onKey)
+    return () => removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="veil" onClick={onClose}>
+      <div className="sheet picker" role="dialog" aria-modal="true" aria-labelledby="rp-t" onClick={e => e.stopPropagation()}>
+        <div className="picker-head">
+          <h2 id="rp-t">Remplacer {ex.name}</h2>
+          <button className="link" onClick={onClose}>Fermer</button>
+        </div>
+        <p className="sub">Pour les mêmes muscles : {ex.primary.map(m => MUSCLE_LABEL[m]).join(', ')}.</p>
+        <div className="picker-list">
+          <div className="pick-group">
+            {options.map(o => (
+              <button key={o.id} className="pick" onClick={() => onPick(o)}>
+                <b>{o.name}</b><span className="data">{o.primary.map(m => MUSCLE_LABEL[m]).join(', ')}</span>
+              </button>
+            ))}
+            {!options.length && <p className="sub">Aucun exercice proche dans le catalogue.</p>}
+            <button className="pick new" onClick={onOther}><b>Choisir un autre exercice</b></button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

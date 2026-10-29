@@ -33,9 +33,8 @@ export function legacySummary() {
   return { sessions, measures: arr(p.body).length, foods: arr(p.food).length }
 }
 
-export async function importLegacy() {
-  const p = read()
-  if (!p) throw new Error('Aucune donnée de Suivi sport trouvée sur cet appareil.')
+// Données de Suivi sport (lues sur l'appareil ou dans un fichier exporté) converties au format de NextRep
+export function convertLegacy(p: Obj, prefs: Obj = {}) {
   const now = Date.now()
 
   // Exercices : on rattache chaque nom au catalogue, sinon on crée un exercice personnel
@@ -117,8 +116,6 @@ export async function importLegacy() {
   })
 
   const prof = obj(p.prof), ng = obj(p.ng)
-  let prefs: Obj = {}
-  try { prefs = obj(JSON.parse(localStorage.getItem(LEGACY_PREFS_KEY) || '{}')) } catch { /* préférences illisibles : on les ignore */ }
   const profile: Profile = {
     ...DEFAULT_PROFILE,
     name: str(prefs.n, 40),
@@ -134,7 +131,21 @@ export async function importLegacy() {
     },
   }
 
-  const workouts = [...byDay.values()]
+  return { workouts: [...byDay.values()], measures, kinds, foods, plans, goals, custom, profile }
+}
+
+// Le fichier exporté par Suivi sport a la même forme que ses données enregistrées sur l'appareil
+export const isLegacyExport = (v: unknown) => {
+  const p = obj(v)
+  return Array.isArray(p.sets) && Array.isArray(p.body)
+}
+
+export async function importLegacy() {
+  const p = read()
+  if (!p) throw new Error('Aucune donnée de Suivi sport trouvée sur cet appareil.')
+  let prefs: Obj = {}
+  try { prefs = obj(JSON.parse(localStorage.getItem(LEGACY_PREFS_KEY) || '{}')) } catch { /* préférences illisibles : on les ignore */ }
+  const { workouts, measures, kinds, foods, plans, goals, custom, profile } = convertLegacy(p, prefs)
   await db.transaction('rw', DATA_TABLES, async () => {
     for (const t of DATA_TABLES) await t.clear()
     await db.workouts.bulkAdd(workouts)

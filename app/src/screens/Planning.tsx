@@ -1,6 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
-import { allExercises, db } from '../data/db'
+import { allExercises, db, getProfile, saveProfile } from '../data/db'
+import { APP_NAME } from '../config'
+import { remindersIcs } from '../lib/ics'
 import { newGroupId, SET_TYPES } from '../data/sets'
 import type { Exercise, Plan, PlanItem, SetType } from '../data/types'
 import { DAYS, today, weekday } from '../lib/dates'
@@ -24,7 +26,8 @@ export function Planning({ onClose }: { onClose: () => void }) {
   const plans = useLiveQuery(() => db.plans.toArray())
   const exercises = useLiveQuery(allExercises) ?? []
   const [picking, setPicking] = useState(false)
-  if (!plans) return null
+  const profile = useLiveQuery(getProfile)
+  if (!plans || !profile) return null
 
   const plan: Plan = plans.find(p => p.weekday === day) ?? { weekday: day, title: '', items: [], updatedAt: 0 }
   const exById = (id: string) => exercises.find(e => e.id === id)
@@ -60,6 +63,21 @@ export function Planning({ onClose }: { onClose: () => void }) {
   const add = (ex: Exercise) => {
     setPicking(false)
     save({ items: [...plan.items, ex.kind === 'cardio' ? { exerciseId: ex.id } : { exerciseId: ex.id, sets: DEFAULT_SETS }] })
+  }
+  const planned = plans.filter(p => p.items.length)
+  // Rappels : un fichier calendrier que le téléphone ajoute à son agenda, avec une alarme les jours prévus
+  const exportReminders = async () => {
+    const file = new File([remindersIcs(plans, profile.reminderTime, today(), APP_NAME)], 'rappels-' + APP_NAME.toLowerCase() + '.ics', { type: 'text/calendar' })
+    try {
+      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file] }); return }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return
+    }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(file)
+    a.download = file.name
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
   const count = (d: number) => plans.find(p => p.weekday === d)?.items.length ?? 0
 
@@ -148,6 +166,21 @@ export function Planning({ onClose }: { onClose: () => void }) {
         <section className="card"><p className="sub">Aucun exercice prévu : c'est un jour de repos.</p></section>
       )}
       <button className="btn soft" onClick={() => setPicking(true)}>+ Ajouter un exercice</button>
+
+      <section className="card">
+        <h2>Rappels</h2>
+        <p className="sub">
+          {planned.length
+            ? `Ajoute ${planned.length > 1 ? `tes ${planned.length} jours` : 'ton jour'} de séance à l'agenda du téléphone : une alarme sonnera à l'heure choisie, même app fermée. Si tu changes de jours, ajoute-les à nouveau.`
+            : 'Prévois au moins une séance pour pouvoir créer des rappels.'}
+        </p>
+        <div className="field">
+          <label htmlFor="pl-time">Heure du rappel</label>
+          <input id="pl-time" className="input" type="time" value={profile.reminderTime}
+            onChange={e => /^\d{2}:\d{2}$/.test(e.target.value) && saveProfile({ reminderTime: e.target.value })} />
+        </div>
+        <button className="btn soft" disabled={!planned.length} onClick={exportReminders}>Ajouter à mon agenda</button>
+      </section>
 
       {picking && (
         <ExercisePicker exercises={exercises} exclude={plan.items.map(x => x.exerciseId)} onPick={add} onClose={() => setPicking(false)} />
