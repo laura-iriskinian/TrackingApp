@@ -1,14 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
-import { allExercises, getProfile, saveProfile } from '../data/db'
+import { allExercises, db, getProfile, saveProfile } from '../data/db'
 import {
-  buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, isFinished, lastSets, nextSetIndex,
-  saveSession, type ActiveSession,
+  buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, groupOf, isFinished, lastSets, nextInRound,
+  nextSetIndex, saveSession, type ActiveSession,
 } from '../data/session'
-import type { Entry, Exercise, SetLog, Workout } from '../data/types'
+import { effortLabel, FEELS, newGroupId, SET_TYPES, typeShort } from '../data/sets'
+import type { Entry, Exercise, Profile, SetLog, SetType, Workout } from '../data/types'
 import { fmtNum, fmtThousands } from '../lib/dates'
 import { keepAwake, restOver, unlockAudio } from '../lib/signal'
 import { entrySummary, musclesOf, volume } from '../lib/summary'
+import { e1rm, recordBeaten, setsOf } from '../lib/records'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { MuscleMap } from '../components/MuscleMap'
 import { ConfirmSheet, useToast } from '../components/ui'
@@ -82,14 +84,45 @@ export function Session({ onClose }: { onClose: () => void }) {
 
   const validate = (ei: number, si: number, values: Omit<SetLog, 'done'>) => {
     unlockAudio()
+    celebrate(s, ei, values)
     const next = completeSet(s, ei, si, values)
-    const rest = !isFinished(next) && restSec > 0
+    // Superset : pas de repos entre les exercices d'un même tour
+    const rest = !isFinished(next) && restSec > 0 && nextInRound(next.entries, ei) == null
     saveSession({ ...next, restEndsAt: rest ? Date.now() + restSec * 1000 : undefined, restTotal: rest ? restSec : undefined })
   }
 
   const patchEntry = (ei: number, fn: (e: Entry) => Entry | null) => {
     const entries = s.entries.flatMap((e, i) => (i === ei ? (fn(e) ?? []) : [e]))
     saveSession({ ...s, entries, cur: Math.min(s.cur, Math.max(0, entries.length - 1)) })
+  }
+
+  // Record battu : un message bref, sans interrompre la séance
+  const celebrate = async (cur: ActiveSession, ei: number, values: Omit<SetLog, 'done'>) => {
+    const id = cur.entries[ei].exerciseId
+    const past = setsOf(await db.workouts.where('exerciseIds').equals(id).toArray(), id)
+    const today = cur.entries.filter(e => e.exerciseId === id).flatMap(e => e.sets.filter(x => x.done))
+    const r = recordBeaten([...past, ...today], { ...values, done: true })
+    if (r === 'weight') toast(`Nouveau record : ${fmtNum(values.weight!)} kg`)
+    else if (r === 'e1rm') toast(`Nouveau record : 1RM estimé ${fmtNum(Math.round(e1rm({ ...values, done: true }) * 2) / 2)} kg`)
+  }
+
+  // Lie l'exercice affiché au suivant, ou le détache de son groupe
+  const link = (on: boolean) => {
+    const ei = s.cur
+    const entries = s.entries.map(e => ({ ...e }))
+    if (on) {
+      const g = entries[ei].group ?? entries[ei + 1]?.group ?? newGroupId()
+      entries[ei].group = g
+      entries[ei + 1].group = g
+    } else {
+      // Les exercices placés après restent enchaînés entre eux
+      const g = entries[ei].group, rest = newGroupId()
+      entries.forEach((e, i) => { if (i > ei && e.group === g) e.group = rest })
+      delete entries[ei].group
+    }
+    // Un groupe d'un seul exercice n'a plus de sens
+    for (const e of entries) if (e.group && entries.filter(x => x.group === e.group).length < 2) delete e.group
+    saveSession({ ...s, entries })
   }
 
   const addExercise = async (picked: Exercise) => {
@@ -124,7 +157,8 @@ export function Session({ onClose }: { onClose: () => void }) {
       </div>
 
       {entry && ex ? (
-        <Current key={s.id + s.cur + entry.exerciseId} s={s} entry={entry} ex={ex} onValidate={validate} onPatch={fn => patchEntry(s.cur, fn)} />
+        <Current key={s.id + s.cur + entry.exerciseId} s={s} entry={entry} ex={ex} effortMode={profile?.effortMode ?? 'off'}
+          onValidate={validate} onPatch={fn => patchEntry(s.cur, fn)} onLink={link} />
       ) : (
         <section className="card">
           <h2>Ta séance est vide</h2>
@@ -137,7 +171,7 @@ export function Session({ onClose }: { onClose: () => void }) {
           {s.entries.map((e, i) => {
             const n = e.sets.filter(x => x.done).length
             return (
-              <button key={i} className={'ses-item' + (i === s.cur ? ' on' : '') + (n === e.sets.length ? ' ok' : '')}
+              <button key={i} className={'ses-item' + (i === s.cur ? ' on' : '') + (n === e.sets.length ? ' ok' : '') + (e.group ? ' linked' : '') + (e.group && s.entries[i + 1]?.group === e.group ? ' link-next' : '')}
                 aria-current={i === s.cur || undefined} onClick={() => saveSession({ ...s, cur: i })}>
                 <b>{exById(e.exerciseId)?.name ?? 'Exercice'}</b>
                 <span className="data">{n}/{e.sets.length}</span>
@@ -184,10 +218,11 @@ function nextLabel(s: ActiveSession, exById: (id: string) => Exercise | undefine
 }
 
 // Exercice affiché : séries faites, série en cours à saisir, séries à venir
-function Current({ s, entry, ex, onValidate, onPatch }: {
-  s: ActiveSession; entry: Entry; ex: Exercise
+function Current({ s, entry, ex, effortMode, onValidate, onPatch, onLink }: {
+  s: ActiveSession; entry: Entry; ex: Exercise; effortMode: Profile['effortMode']
   onValidate: (ei: number, si: number, v: Omit<SetLog, 'done'>) => void
   onPatch: (fn: (e: Entry) => Entry | null) => void
+  onLink: (link: boolean) => void
 }) {
   const cardio = ex.kind === 'cardio'
   const si = nextSetIndex(entry)
@@ -197,8 +232,12 @@ function Current({ s, entry, ex, onValidate, onPatch }: {
     ? [{ k: 'km', label: 'Distance', unit: 'km', step: .5 }, { k: 'min', label: 'Durée', unit: 'min', step: 1 }] as const
     : [{ k: 'weight', label: 'Charge', unit: 'kg', step: 2.5 }, { k: 'reps', label: 'Répétitions', unit: 'rép.', step: 1 }] as const
   const [vals, setVals] = useState<Record<string, string>>({})
+  const [type, setType] = useState<SetType | undefined>()
+  const [effort, setEffort] = useState<Pick<SetLog, 'feel' | 'rpe' | 'rir'>>({})
   useEffect(() => {
     setVals(Object.fromEntries(fields.map(f => [f.k, set?.[f.k] != null ? fmtNum(set[f.k]!) : ''])))
+    setType(set?.type)
+    setEffort({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [si, entry.sets.length])
 
@@ -210,12 +249,15 @@ function Current({ s, entry, ex, onValidate, onPatch }: {
   const canValidate = cardio ? values.km != null || values.min != null : values.reps != null
   const { primary, secondary } = musclesOf([ex])
   const hasMap = primary.length + secondary.length > 0
+  const ei = s.cur
+  const group = groupOf(s.entries, ei)
+  const linked = group.length > 1
 
   return (
     <section className="card current">
       <div className="cur-head">
         <div>
-          <span className="eyebrow">{ex.group}{entry.technique ? ' · ' + entry.technique : ''}</span>
+          <span className="eyebrow">{linked ? `Superset · ${group.indexOf(ei) + 1} sur ${group.length}` : ex.group}</span>
           <h2>{ex.name}</h2>
           <span className="sub">
             {last?.length ? 'La dernière fois : ' + entrySummary({ exerciseId: ex.id, sets: last }, ex) : 'Première fois : note ce que tu fais, on s\'en souviendra.'}
@@ -229,23 +271,34 @@ function Current({ s, entry, ex, onValidate, onPatch }: {
         )}
       </div>
 
+      <ExerciseNoteField exerciseId={ex.id} />
+
       <ol className="sets">
-        {entry.sets.map((x, i) => (
-          <li key={i} className={x.done ? 'done' : i === si ? 'now' : ''}>
-            <span className="data">{i + 1}</span>
-            <span>{cardio
-              ? [x.km != null && fmtNum(x.km) + ' km', x.min != null && fmtNum(x.min) + ' min'].filter(Boolean).join(' · ') || '—'
-              : `${x.weight != null ? fmtNum(x.weight) + ' kg' : 'poids du corps'} × ${x.reps ?? '?'}`}</span>
-            {x.done
-              ? <button className="tick" aria-label={`Série ${i + 1} faite, toucher pour la corriger`}
-                  onClick={() => onPatch(e => ({ ...e, sets: e.sets.map((y, j) => (j === i ? { ...y, done: false } : y)) }))}>✓</button>
-              : <span className="data">{i === si ? 'en cours' : ''}</span>}
-          </li>
-        ))}
+        {entry.sets.map((x, i) => {
+          const tag = [typeShort(x.type), x.done ? effortLabel(x) : ''].filter(Boolean).join(' · ')
+          return (
+            <li key={i} className={x.done ? 'done' : i === si ? 'now' : ''}>
+              <span className="data">{i + 1}</span>
+              <span>{cardio
+                ? [x.km != null && fmtNum(x.km) + ' km', x.min != null && fmtNum(x.min) + ' min'].filter(Boolean).join(' · ') || '—'
+                : `${x.weight != null ? fmtNum(x.weight) + ' kg' : 'poids du corps'} × ${x.reps ?? '?'}`}
+                {tag && <span className="set-tag">{tag}</span>}</span>
+              {x.done
+                ? <button className="tick" aria-label={`Série ${i + 1} faite, toucher pour la corriger`}
+                    onClick={() => onPatch(e => ({ ...e, sets: e.sets.map((y, j) => (j === i ? { ...y, done: false } : y)) }))}>✓</button>
+                : <span className="data">{i === si ? 'en cours' : ''}</span>}
+            </li>
+          )
+        })}
       </ol>
 
       {set ? (
         <div className="entry-form">
+          <div className="chips" role="group" aria-label="Type de série">
+            {SET_TYPES.map(t => (
+              <button key={t.label} aria-pressed={type === t.id} onClick={() => setType(t.id)}>{t.label}</button>
+            ))}
+          </div>
           <div className="steppers">
             {fields.map(f => (
               <div key={f.k} className="stepper">
@@ -260,7 +313,8 @@ function Current({ s, entry, ex, onValidate, onPatch }: {
               </div>
             ))}
           </div>
-          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(s.cur, si, values)}>
+          {effortMode !== 'off' && <EffortPicker mode={effortMode} value={effort} onChange={setEffort} />}
+          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(ei, si, { ...values, type, ...effort })}>
             Valider la série {si + 1}
           </button>
         </div>
@@ -269,16 +323,54 @@ function Current({ s, entry, ex, onValidate, onPatch }: {
       )}
 
       <div className="row cur-tools">
-        <button className="link" onClick={() => onPatch(e => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? {}), done: false }] }))}>+ Série</button>
+        <button className="link" onClick={() => onPatch(e => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? {}), feel: undefined, rpe: undefined, rir: undefined, done: false }] }))}>+ Série</button>
         {entry.sets.some(x => !x.done) && entry.sets.length > 1 && (
           <button className="link" onClick={() => onPatch(e => {
             const i = e.sets.map(x => x.done).lastIndexOf(false)
             return { ...e, sets: e.sets.filter((_, j) => j !== i) }
           })}>− Série</button>
         )}
+        {linked
+          ? <button className="link" onClick={() => onLink(false)}>Ne plus enchaîner</button>
+          : ei < s.entries.length - 1 && <button className="link" onClick={() => onLink(true)}>Enchaîner avec le suivant</button>}
         <button className="link" onClick={() => onPatch(() => null)}>Retirer l'exercice</button>
       </div>
     </section>
+  )
+}
+
+// Ressenti de la série : simple, ou de 1 à 10 (RPE), ou en répétitions en réserve (RIR)
+function EffortPicker({ mode, value, onChange }: {
+  mode: Exclude<Profile['effortMode'], 'off'>; value: Pick<SetLog, 'feel' | 'rpe' | 'rir'>
+  onChange: (v: Pick<SetLog, 'feel' | 'rpe' | 'rir'>) => void
+}) {
+  const opts = mode === 'simple'
+    ? FEELS.map(f => ({ label: f.label, on: value.feel === f.id, v: { feel: f.id } }))
+    : mode === 'rpe'
+      ? [6, 7, 8, 9, 10].map(n => ({ label: String(n), on: value.rpe === n, v: { rpe: n } }))
+      : [4, 3, 2, 1, 0].map(n => ({ label: n === 4 ? '4+' : String(n), on: value.rir === n, v: { rir: n } }))
+  return (
+    <div className="effort">
+      <span className="sub" id="ef-l">{mode === 'simple' ? 'Ressenti' : mode === 'rpe' ? 'Effort (RPE)' : 'Répétitions en réserve'} · facultatif</span>
+      <div className="seg" role="group" aria-labelledby="ef-l">
+        {opts.map(o => <button key={o.label} aria-pressed={o.on} onClick={() => onChange(o.on ? {} : o.v)}>{o.label}</button>)}
+      </div>
+    </div>
+  )
+}
+
+// Note gardée d'une séance à l'autre pour cet exercice (réglage de la machine, prise…)
+function ExerciseNoteField({ exerciseId }: { exerciseId: string }) {
+  const note = useLiveQuery(() => db.notes.get(exerciseId), [exerciseId], null)
+  if (note === null) return null
+  return (
+    <input className="input ex-note" key={exerciseId} defaultValue={note?.text ?? ''} maxLength={200}
+      placeholder="Note pour la prochaine fois (ex. siège cran 4)" aria-label="Note sur l'exercice"
+      onChange={e => {
+        const text = e.target.value.trim()
+        if (text) db.notes.put({ exerciseId, text, updatedAt: Date.now() })
+        else db.notes.delete(exerciseId)
+      }} />
   )
 }
 

@@ -28,3 +28,6 @@ export const longDate = (s: string) => {
 
 export const fmtNum = (n: number) => String(+n.toFixed(2)).replace('.', ',')
 export const fmtThousands = (n: number) => Math.round(n).toLocaleString('fr-FR')
+
+// « 1 séance », « 3 séances »
+export const nb = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`

@@ -55,7 +55,7 @@ describe('récupération depuis Suivi sport', () => {
     expect((await db.measureKinds.toArray())[0]).toMatchObject({ id: 'perso-k1', name: 'Mollet' })
 
     const plan = await db.plans.get(0)
-    expect(plan?.items).toEqual([{ exerciseId: 'squat', sets: 4, technique: 'Pyramidal' }, { exerciseId: 'course' }])
+    expect(plan?.items).toEqual([{ exerciseId: 'squat', sets: 4, types: ['pyramid', 'pyramid', 'pyramid', 'pyramid'] }, { exerciseId: 'course' }])
 
     expect((await db.goals.toArray())[0]).toMatchObject({ metric: 'max-weight:squat', target: 100, start: 80, direction: 'up' })
 

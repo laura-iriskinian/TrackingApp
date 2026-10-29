@@ -3,17 +3,24 @@ import { useMemo, useState } from 'react'
 import { APP_NAME, THEME_KEY } from '../config'
 import { db, eraseAll, exportAll, getProfile, saveProfile } from '../data/db'
 import { importLegacy, legacySummary } from '../data/legacy'
-import { today } from '../lib/dates'
+import { longDate, nb, today } from '../lib/dates'
+import { checkBackup, MAX_BACKUP_BYTES, restoreBackup, type CheckedBackup } from '../data/backup'
 import { applyTheme, type Theme } from '../lib/theme'
 import { ConfirmSheet, useToast } from '../components/ui'
 import { Mark } from '../components/Logo'
 
-type Sheet = 'legacy' | 'erase' | null
+type Sheet = 'legacy' | 'erase' | 'restore' | null
 
 export function Profile() {
   const profile = useLiveQuery(getProfile)
   const counts = useLiveQuery(async () => ({ workouts: await db.workouts.count(), measures: await db.measures.count() }))
   const imported = useLiveQuery(() => db.kv.get('legacyImportedAt'))
+  // Séances notées dans NextRep depuis la dernière récupération : elles seraient perdues en récupérant à nouveau
+  const ownWorkouts = useLiveQuery(async () => {
+    const at = Date.parse(String((await db.kv.get('legacyImportedAt'))?.value ?? '')) || 0
+    return db.workouts.filter(w => w.updatedAt > at).count()
+  })
+  const [backup, setBackup] = useState<CheckedBackup | null>(null)
   const legacy = useMemo(legacySummary, [])
   const toast = useToast()
   const [sheet, setSheet] = useState<Sheet>(null)
@@ -39,6 +46,17 @@ export function Profile() {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
 
+  const openBackup = async (file?: File) => {
+    if (!file) return
+    try {
+      if (file.size > MAX_BACKUP_BYTES) throw new Error('Ce fichier est trop gros pour être une sauvegarde NextRep.')
+      setBackup(checkBackup(await file.text()))
+      setSheet('restore')
+    } catch (e) {
+      toast((e as Error).message)
+    }
+  }
+
   return (
     <div className="screen">
       <header className="head"><h1>Profil</h1></header>
@@ -59,6 +77,17 @@ export function Profile() {
           </div>
         </div>
         <div className="field">
+          <span className="sub" id="ef-l">Ressenti d'effort après chaque série</span>
+          <div className="seg" role="group" aria-labelledby="ef-l">
+            {([['off', 'Non'], ['simple', 'Simple'], ['rpe', 'RPE'], ['rir', 'RIR']] as const).map(([v, l]) => (
+              <button key={v} aria-pressed={(profile?.effortMode ?? 'off') === v} onClick={() => saveProfile({ effortMode: v })}>{l}</button>
+            ))}
+          </div>
+          <span className="data">
+            {{ off: 'Pas de question après les séries.', simple: 'Facile, dur ou limite.', rpe: 'Effort de 6 à 10 : 10 = impossible d\'en faire une de plus.', rir: 'Nombre de répétitions que tu aurais encore pu faire.' }[profile?.effortMode ?? 'off']}
+          </span>
+        </div>
+        <div className="field">
           <span className="sub" id="th-l">Apparence</span>
           <div className="seg" role="group" aria-labelledby="th-l">
             {([['light', 'Clair'], ['dark', 'Sombre'], ['auto', 'Automatique']] as [Theme, string][]).map(([v, l]) => (
@@ -75,6 +104,10 @@ export function Profile() {
           Rien n'est envoyé sur internet. Pense à faire une sauvegarde de temps en temps.
         </p>
         <button className="btn" onClick={exportData}>Exporter une sauvegarde</button>
+        <label className="btn soft file-btn">
+          Restaurer une sauvegarde
+          <input type="file" accept="application/json,.json" onChange={e => { openBackup(e.target.files?.[0]); e.target.value = '' }} />
+        </label>
         {legacy && (
           <button className="btn soft" onClick={() => setSheet('legacy')}>
             {imported ? 'Récupérer à nouveau depuis Suivi sport' : 'Récupérer mes données de Suivi sport'}
@@ -90,13 +123,31 @@ export function Profile() {
       {sheet === 'legacy' && (
         <ConfirmSheet
           title="Récupérer depuis Suivi sport ?"
-          text={`Les données de ${APP_NAME} seront remplacées par une copie de celles de Suivi sport (${legacy?.sessions} jours d'entraînement, ${legacy?.measures} mesures). Suivi sport n'est pas modifiée.`}
+          text={`Les données de ${APP_NAME} seront remplacées par une copie de celles de Suivi sport (${legacy?.sessions} jours d'entraînement, ${legacy?.measures} mesures). Suivi sport n'est pas modifiée.`
+            + (ownWorkouts ? ` Attention : ${ownWorkouts} séance${ownWorkouts > 1 ? 's' : ''} notée${ownWorkouts > 1 ? 's' : ''} ou modifiée${ownWorkouts > 1 ? 's' : ''} dans ${APP_NAME} ser${ownWorkouts > 1 ? 'ont' : 'a'} perdue${ownWorkouts > 1 ? 's' : ''}. Exporte une sauvegarde avant.` : '')}
+          danger={!!ownWorkouts}
           confirmLabel="Remplacer par Suivi sport"
           onClose={() => setSheet(null)}
           onConfirm={async () => {
             try { const r = await importLegacy(); toast(`${r.workouts} séances récupérées`) }
             catch (e) { toast((e as Error).message) }
             setSheet(null)
+          }}
+        />
+      )}
+      {sheet === 'restore' && backup && (
+        <ConfirmSheet
+          danger
+          title="Restaurer cette sauvegarde ?"
+          text={`Sauvegarde${backup.exportedAt ? ' du ' + longDate(backup.exportedAt.slice(0, 10)).toLowerCase() : ''} : ${nb(backup.rows.workouts.length, 'séance')} et ${nb(backup.rows.measures.length, 'mesure')}. `
+            + `Elle remplacera toutes les données actuelles de ${APP_NAME} (${nb(counts?.workouts ?? 0, 'séance')}).`
+            + (backup.skipped ? ` ${backup.skipped} élément${backup.skipped > 1 ? 's' : ''} illisible${backup.skipped > 1 ? 's' : ''} ser${backup.skipped > 1 ? 'ont' : 'a'} ignoré${backup.skipped > 1 ? 's' : ''}.` : '')}
+          confirmLabel="Restaurer"
+          onClose={() => { setSheet(null); setBackup(null) }}
+          onConfirm={async () => {
+            await restoreBackup(backup)
+            setSheet(null); setBackup(null)
+            toast('Sauvegarde restaurée')
           }}
         />
       )}
@@ -110,7 +161,7 @@ export function Profile() {
           onConfirm={async () => { await eraseAll(); pickTheme('auto'); setSheet(null); toast('Toutes tes données ont été supprimées') }}
         />
       )}
-      <style>{'.about{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:.8rem;padding:8px 0}'}</style>
+      <style>{'.file-btn{position:relative;text-align:center;cursor:pointer}.file-btn input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.file-btn:focus-within{outline:2px solid var(--effort);outline-offset:3px}.about{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:.8rem;padding:8px 0}'}</style>
     </div>
   )
 }

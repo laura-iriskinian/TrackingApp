@@ -35,16 +35,20 @@ export async function lastSets(exerciseId: string): Promise<SetLog[]> {
   return []
 }
 
-// Prépare un exercice : nombre de séries prévu, valeurs reprises de la dernière fois
-export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, 'sets' | 'technique'>): Entry {
-  const n = item?.sets || last.length || (ex.kind === 'cardio' ? 1 : DEFAULT_SETS)
+// Prépare un exercice : nombre et type des séries prévus, valeurs reprises de la dernière fois.
+// Sans planning, le type de chaque série est aussi repris de la dernière fois.
+export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, 'sets' | 'types' | 'group'>): Entry {
+  const n = item?.sets || item?.types?.length || last.length || (ex.kind === 'cardio' ? 1 : DEFAULT_SETS)
   const sets: SetLog[] = Array.from({ length: n }, (_, i) => {
     const p = last[Math.min(i, last.length - 1)]
-    return ex.kind === 'cardio'
+    const type = item?.types ? item.types[i] ?? undefined : item?.sets ? undefined : p?.type
+    const s: SetLog = ex.kind === 'cardio'
       ? { km: p?.km, min: p?.min, done: false }
       : { weight: p?.weight, reps: p?.reps, done: false }
+    if (type) s.type = type
+    return s
   })
-  return { exerciseId: ex.id, technique: item?.technique, sets }
+  return item?.group ? { exerciseId: ex.id, group: item.group, sets } : { exerciseId: ex.id, sets }
 }
 
 export async function startSession(title: string | undefined, items: PlanItem[], exercises: Exercise[]) {
@@ -60,29 +64,45 @@ export async function startSession(title: string | undefined, items: PlanItem[],
 
 export const nextSetIndex = (e: Entry) => e.sets.findIndex(s => !s.done)
 
+// Exercices enchaînés avec celui-ci (superset ou circuit), dans l'ordre de la séance
+export const groupOf = (entries: Entry[], ei: number) =>
+  entries[ei]?.group ? [...entries.keys()].filter(i => entries[i].group === entries[ei].group) : [ei]
+
+// Après une série de l'exercice ei, l'exercice suivant du même tour s'il en reste un (on enchaîne sans repos)
+export function nextInRound(entries: Entry[], ei: number): number | undefined {
+  const g = groupOf(entries, ei)
+  return g.slice(g.indexOf(ei) + 1).find(i => nextSetIndex(entries[i]) >= 0)
+}
+
 // Valide une série. Les séries suivantes qui avaient les mêmes valeurs suivent la modification :
 // si on monte à 62,5 kg à la première série, les autres passent aussi à 62,5 kg.
+// Dans un superset, on passe à l'exercice suivant du tour ; à la fin du tour, on revient au premier.
 export function completeSet(s: ActiveSession, ei: number, si: number, values: Omit<SetLog, 'done'>): ActiveSession {
   const entries = s.entries.map((e, i) => {
     if (i !== ei) return e
     const before = e.sets[si]
     const sets = e.sets.map((x, j) => {
       if (j === si) return { ...x, ...values, done: true }
-      if (j > si && !x.done && sameValues(x, before)) return { ...x, ...values }
+      if (j > si && !x.done && sameValues(x, before)) return { ...x, weight: values.weight, reps: values.reps, km: values.km, min: values.min }
       return x
     })
     return { ...e, sets }
   })
-  // Exercice terminé : on passe au suivant qui a encore des séries à faire
   let cur = s.cur
-  if (nextSetIndex(entries[ei]) < 0) {
+  const g = groupOf(entries, ei)
+  const inRound = nextInRound(entries, ei)
+  const restart = g.find(i => nextSetIndex(entries[i]) >= 0)
+  if (inRound != null) cur = inRound
+  else if (g.length > 1 && restart != null) cur = restart
+  // Exercice terminé : on passe au suivant qui a encore des séries à faire
+  else if (nextSetIndex(entries[ei]) < 0) {
     const order = [...entries.keys()].slice(ei + 1).concat([...entries.keys()].slice(0, ei))
     cur = order.find(i => nextSetIndex(entries[i]) >= 0) ?? ei
   }
   return { ...s, entries, cur }
 }
 
-const sameValues = (a: SetLog, b: SetLog) => a.weight === b.weight && a.reps === b.reps && a.km === b.km && a.min === b.min
+const sameValues = (a: SetLog, b: SetLog) => a.weight === b.weight && a.reps === b.reps && a.km === b.km && a.min === b.min && a.type === b.type
 
 export const isFinished = (s: ActiveSession) => s.entries.length > 0 && s.entries.every(e => nextSetIndex(e) < 0)
 export const doneCount = (s: ActiveSession) => s.entries.reduce((a, e) => a + e.sets.filter(x => x.done).length, 0)

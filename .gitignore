@@ -1,0 +1,4 @@
+# Notes privées (plan, idées, consignes) : le dépôt est public, elles restent sur cet ordinateur
+*.md
+
+.DS_Store

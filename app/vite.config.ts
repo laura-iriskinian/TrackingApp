@@ -11,6 +11,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // enregistré dans src/lib/update.ts
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'NextRep',
@@ -28,7 +29,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'], cleanupOutdatedCaches: true, clientsClaim: true, skipWaiting: true },
     }),
   ],
 })

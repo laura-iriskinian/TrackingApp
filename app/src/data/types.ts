@@ -17,17 +17,27 @@ export interface Exercise {
   custom?: boolean
 }
 
+// Façon de faire une série. Absent = série normale.
+export type SetType = 'warmup' | 'failure' | 'drop' | 'restpause' | 'pyramid'
+
+// Ressenti d'effort, facultatif : simple, RPE (1 à 10) ou répétitions en réserve
+export type Feel = 'easy' | 'hard' | 'max'
+
 export interface SetLog {
   weight?: number
   reps?: number
   km?: number
   min?: number
+  type?: SetType
+  feel?: Feel
+  rpe?: number
+  rir?: number
   done: boolean
 }
 
 export interface Entry {
   exerciseId: string
-  technique?: string
+  group?: string // exercices enchaînés en superset ou circuit : même valeur, à la suite dans la séance
   sets: SetLog[]
 }
 
@@ -68,7 +78,8 @@ export interface Food {
 export interface PlanItem {
   exerciseId: string
   sets?: number
-  technique?: string
+  types?: (SetType | null)[] // type de chaque série prévue, null = normale
+  group?: string
 }
 
 export interface Plan {
@@ -96,7 +107,14 @@ export interface Profile {
   sex?: 'f' | 'h'
   weekStart: number
   restSec: number // repos par défaut entre deux séries
+  effortMode: 'off' | 'simple' | 'rpe' | 'rir'
   nutritionTargets: { kcal: number; protein: number; carbs: number; fat: number }
+}
+
+export interface ExerciseNote {
+  exerciseId: string
+  text: string
+  updatedAt: number
 }
 
 export interface KV {

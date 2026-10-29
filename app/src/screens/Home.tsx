@@ -4,10 +4,11 @@ import { allExercises, db, getProfile } from '../data/db'
 import { importLegacy, legacySummary } from '../data/legacy'
 import { addDays, DAYS, fmtThousands, longDate, parse, today, weekday, weekStartOf } from '../lib/dates'
 import { musclesOf, volume } from '../lib/summary'
+import { typesSummary } from '../data/sets'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
 import { getSession, startSession } from '../data/session'
-import { openSession } from '../lib/nav'
+import { openPlanning, openSession } from '../lib/nav'
 import './Home.css'
 
 export function Home() {
@@ -115,12 +116,13 @@ export function Home() {
               {plan.items.map((it, i) => (
                 <li key={i}>
                   <span>{exById(it.exerciseId)?.name ?? 'Exercice'}</span>
-                  <span className="data">{it.sets ? it.sets + ' séries' : ''}{it.technique ? ' · ' + it.technique.toLowerCase() : ''}</span>
+                  <span className="data">{[it.sets || it.types?.length ? (it.sets || it.types!.length) + ' séries' : '', typesSummary(it.types ?? []), it.group ? 'superset' : ''].filter(Boolean).join(' · ')}</span>
                 </li>
               ))}
             </ol>
           )}
           {!active && <button className="btn go" onClick={() => start(plan.title || undefined)}>Commencer la séance</button>}
+          <button className="link plan-link" onClick={openPlanning}>Modifier le planning</button>
         </section>
       ) : (
         <section className="card">
@@ -128,6 +130,7 @@ export function Home() {
           <h2>Pas de séance prévue</h2>
           <p className="sub">Profite du repos, ou entraîne-toi librement.</p>
           {!active && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
+          <button className="link plan-link" onClick={openPlanning}>Préparer le planning de la semaine</button>
         </section>
       )}
 

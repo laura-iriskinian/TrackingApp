@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { allExercises, db, eraseAll } from './db'
-import { buildEntry, completeSet, finishSession, getSession, isFinished, startSession } from './session'
+import { buildEntry, completeSet, finishSession, getSession, isFinished, nextInRound, startSession } from './session'
 import { CATALOG } from './exercises'
 import { today } from '../lib/dates'
 
@@ -67,5 +67,33 @@ describe('séance guidée', () => {
     expect(await finishSession(s)).toBeNull()
     expect(await db.workouts.count()).toBe(0)
     expect(await getSession()).toBeUndefined()
+  })
+
+  it('reprend le type des séries de la dernière fois, ou celui du planning', () => {
+    const last = [{ weight: 20, reps: 12, type: 'warmup' as const, done: true }, { weight: 60, reps: 8, done: true }]
+    expect(buildEntry(squat, last).sets.map(x => x.type)).toEqual(['warmup', undefined])
+    expect(buildEntry(squat, last, { types: ['warmup', null, 'failure'], group: 'g' })).toMatchObject({
+      group: 'g', sets: [{ type: 'warmup', weight: 20 }, { weight: 60 }, { type: 'failure', weight: 60 }],
+    })
+    expect(buildEntry(squat, last, { sets: 3 }).sets.every(x => !x.type)).toBe(true)
+  })
+
+  it('garde le type et le ressenti de la série validée, sans les copier sur les suivantes', () => {
+    const s = { id: 's', date: today(), startedAt: 0, cur: 0, entries: [buildEntry(squat, [{ weight: 60, reps: 8, done: true }], { sets: 2 })] }
+    const n = completeSet(s, 0, 0, { weight: 60, reps: 8, type: 'failure', feel: 'max' })
+    expect(n.entries[0].sets).toEqual([{ weight: 60, reps: 8, type: 'failure', feel: 'max', done: true }, { weight: 60, reps: 8, done: false }])
+  })
+
+  it('enchaîne les exercices d’un superset, avec un repos seulement à la fin du tour', () => {
+    const a = { ...buildEntry(squat, [], { sets: 2 }), group: 'g' }
+    const b = { ...buildEntry(squat, [], { sets: 2 }), exerciseId: 'fentes', group: 'g' }
+    let s = { id: 's', date: today(), startedAt: 0, cur: 0, entries: [a, b, buildEntry(course, [])] }
+    s = completeSet(s, 0, 0, { weight: 50, reps: 10 })
+    expect([s.cur, nextInRound(s.entries, 0)]).toEqual([1, 1]) // pas de repos, on passe au 2e exercice
+    s = completeSet(s, 1, 0, { weight: 20, reps: 10 })
+    expect([s.cur, nextInRound(s.entries, 1)]).toEqual([0, undefined]) // fin du tour : repos, puis retour au 1er
+    s = completeSet(s, 0, 1, { weight: 50, reps: 10 })
+    s = completeSet(s, 1, 1, { weight: 20, reps: 10 })
+    expect(s.cur).toBe(2) // superset fini : exercice suivant
   })
 })

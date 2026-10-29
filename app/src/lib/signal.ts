@@ -12,7 +12,7 @@ export function unlockAudio() {
   } catch { /* pas de son disponible */ }
 }
 
-function beep(freq: number, at: number, dur: number) {
+export function beep(freq: number, at: number, dur: number) {
   if (!ctx) return
   const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + at
   o.type = 'sine'

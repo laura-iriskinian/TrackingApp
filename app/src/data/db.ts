@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Exercise, Food, Goal, KV, Measure, MeasureKind, Plan, Profile, Workout } from './types'
+import type { Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Plan, Profile, Workout } from './types'
 import { CATALOG } from './exercises'
+import { migrateEntries, migrateItems } from './sets'
 
 export const db = new Dexie('nextrep') as Dexie & {
   workouts: EntityTable<Workout, 'id'>
@@ -10,6 +11,7 @@ export const db = new Dexie('nextrep') as Dexie & {
   plans: EntityTable<Plan, 'weekday'>
   goals: EntityTable<Goal, 'id'>
   exercises: EntityTable<Exercise, 'id'> // exercices créés par l'utilisateur
+  notes: EntityTable<ExerciseNote, 'exerciseId'> // note gardée d'une séance à l'autre
   kv: EntityTable<KV, 'key'>
 }
 
@@ -24,13 +26,24 @@ db.version(1).stores({
   kv: 'key',
 })
 
-export const DATA_TABLES = [db.workouts, db.measures, db.measureKinds, db.foods, db.plans, db.goals, db.exercises, db.kv]
+// Version 2 : le type se choisit par série (et non plus une technique pour tout l'exercice), supersets, notes
+db.version(2).stores({ notes: 'exerciseId' }).upgrade(async tx => {
+  await tx.table('workouts').toCollection().modify((w: Workout) => { w.entries = migrateEntries(w.entries) })
+  await tx.table('plans').toCollection().modify((p: Plan) => { p.items = migrateItems(p.items) })
+  await tx.table('kv').where('key').equals('session').modify((r: KV) => {
+    const v = r.value as { entries?: Workout['entries'] }
+    if (v?.entries) v.entries = migrateEntries(v.entries)
+  })
+})
+
+export const DATA_TABLES = [db.workouts, db.measures, db.measureKinds, db.foods, db.plans, db.goals, db.exercises, db.notes, db.kv]
 
 export const newId = () => crypto.randomUUID()
 
 export const DEFAULT_PROFILE: Profile = {
   weekStart: 0,
   restSec: 90,
+  effortMode: 'off',
   nutritionTargets: { kcal: 2000, protein: 100, carbs: 250, fat: 70 },
 }
 
@@ -60,7 +73,7 @@ export const BASE_MEASURES: MeasureKind[] = [
 export async function exportAll() {
   const data: Record<string, unknown[]> = {}
   for (const t of DATA_TABLES) data[t.name] = await t.toArray()
-  return { app: 'NextRep', format: 1, exportedAt: new Date().toISOString(), data }
+  return { app: 'NextRep', format: 2, exportedAt: new Date().toISOString(), data }
 }
 
 // Droit à l'effacement : supprime tout ce que NextRep a enregistré sur cet appareil

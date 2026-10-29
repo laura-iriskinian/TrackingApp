@@ -3,7 +3,7 @@ import { allExercises, db } from '../data/db'
 import { longDate, MONTHS, parse } from '../lib/dates'
 import { entrySummary } from '../lib/summary'
 import { getSession, startSession } from '../data/session'
-import { openSession } from '../lib/nav'
+import { openPlanning, openSession, openTimer, openWorkoutEdit } from '../lib/nav'
 
 export function Workouts() {
   const workouts = useLiveQuery(() => db.workouts.orderBy('date').reverse().toArray())
@@ -23,8 +23,15 @@ export function Workouts() {
 
   return (
     <div className="screen">
-      <header className="head"><h1>Séances</h1></header>
+      <header className="head w-top">
+        <h1>Séances</h1>
+        <div className="row">
+          <button className="pill soft" onClick={openPlanning}>Planning</button>
+          <button className="pill soft" onClick={openTimer}>Minuteur</button>
+        </div>
+      </header>
       <button className="btn go" onClick={start}>{active ? 'Reprendre la séance en cours' : 'Nouvelle séance'}</button>
+      <button className="btn soft" onClick={() => openWorkoutEdit()}>Ajouter une séance passée</button>
 
       {workouts && !workouts.length && (
         <section className="card">
@@ -44,7 +51,10 @@ export function Workouts() {
           <div style={{ display: 'grid', gap: 10 }}>
             {list.map(w => (
               <article key={w.id} className="card">
-                <span className="sub">{longDate(w.date)}</span>
+                <div className="w-head">
+                  <span className="sub">{longDate(w.date)}</span>
+                  <button className="link" onClick={() => openWorkoutEdit(w.id)} aria-label={`Modifier la séance du ${longDate(w.date).toLowerCase()}`}>Modifier</button>
+                </div>
                 <div className="list">
                   {w.entries.map((e, i) => (
                     <div key={i} className="li">

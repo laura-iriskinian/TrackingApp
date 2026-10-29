@@ -113,6 +113,7 @@ h1,.hi{margin-right:104px}
 <body>
 <header><p class="hi">Suivi sport</p><h1 id="ttl"></h1><p class="mut" id="wk"></p><button id="gear" aria-label="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></button><button id="chbtn" aria-label="Chronomètre"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></button></header>
 <div id="up" class="card" hidden style="border-color:var(--acc)"><p style="margin:0 0 10px">Une nouvelle version de l'appli est disponible.</p><button id="up-go">Mettre à jour</button></div>
+<div id="nr" class="card" hidden style="border-color:var(--acc)"><h2>Suivi sport devient NextRep</h2><p class="mut" style="margin:0 0 10px">NextRep est la nouvelle version de l'appli. Ouvre-la sur ce téléphone : elle te propose de récupérer tes séances, mesures et objectifs en un geste. Suivi sport reste disponible en attendant.</p><div class="row" style="margin:0"><button id="nr-go">Ouvrir NextRep</button><button id="nr-later" class="sec">Plus tard</button></div></div>
 
 <section id="t-accueil" class="on">
   <div class="card"><h2>Objectifs</h2><div id="a-goals"></div><button class="sec" data-go="progres" data-sc="g-card" style="margin-top:10px">Gérer les objectifs</button></div>
@@ -709,7 +710,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!
 $('chbtn').onclick=()=>go('chrono');
 (()=>{const c=P.ch||{w:30,r:15,n:8,p:5};['w','r','n','p'].forEach(k=>$('ch-'+k).value=c[k]);chTotal();chDraw();
   $('ch-note').textContent='Garde l\'appli ouverte pendant l\'exercice : si l\'écran s\'éteint, le chrono et les sons peuvent s\'arrêter.'+(navigator.wakeLock?'':' Ton navigateur ne peut pas garder l\'écran allumé tout seul.')+' Sur iPhone, le son peut être coupé quand le bouton silencieux est activé.'})();
-const APP_V='2026-10-29-a';
+const APP_V='2026-10-29-b';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
@@ -724,6 +725,10 @@ async function checkUpdate(){
   }catch(e){}
 }
 $('up-go').onclick=()=>location.replace(location.pathname+'?v='+Date.now());
+// Bascule vers NextRep : message discret, masquable une semaine
+$('nr').hidden=Date.now()-(P.nrLater||0)<7*864e5;
+$('nr-go').onclick=()=>{location.href='nextrep/'};
+$('nr-later').onclick=()=>{P.nrLater=Date.now();saveP();$('nr').hidden=true};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
 window.addEventListener('pageshow',checkUpdate);
 checkUpdate();

@@ -91,6 +91,12 @@ button { cursor: pointer; }
 .li:last-child { padding-bottom: 0; }
 .li b { font: 700 1rem var(--f-display); letter-spacing: -.01em; }
 
+.w-top { grid-template-columns: 1fr auto; align-items: center; }
+.w-top .row { gap: 6px; }
+.pill.soft { background: var(--surface); color: var(--ink); }
+.w-head { display: flex; justify-content: space-between; align-items: center; margin: -6px 0 -4px; }
+.w-head .link { color: var(--mute); padding: 6px 0 6px 12px; }
+
 .empty { text-align: left; color: var(--mute); font-size: .95rem; }
 
 /* Barre d'onglets flottante */
@@ -135,3 +141,36 @@ button { cursor: pointer; }
 .outline { fill: none; stroke: var(--muscle); stroke-width: 1; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Courbes */
+.chart { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.chart svg { display: block; overflow: visible; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-tick { font: 500 10px var(--f-data); fill: var(--mute); }
+.chart-end { font: 600 11px var(--f-data); fill: var(--ink); }
+.chart-line { fill: none; stroke: var(--effort); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-area { fill: var(--effort); opacity: .1; }
+.chart-dot { fill: var(--effort); stroke: var(--surface); stroke-width: 2; }
+.chart-cross { stroke: var(--mute); stroke-width: 1; }
+.chart-tip {
+  position: absolute; top: -6px; width: 120px; display: grid; justify-items: center; pointer-events: none;
+  background: var(--ink); color: var(--paper); border-radius: 10px; padding: 5px 8px; font: 500 .75rem var(--f-data);
+}
+.chart-tip b { font: 700 .9rem var(--f-display); }
+.chart-empty { padding: 8px 0; }
+
+/* Progrès : corps et objectifs (les pastilles .chips sont définies avec la séance) */
+.body-kinds { margin: 0 -16px; padding: 0 16px 2px; }
+.body-kinds button { background: var(--surface); }
+.body-head > div { display: grid; gap: 4px; }
+.measure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.goal-head { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+.goal-head h2 { font-size: 1.15rem; margin-top: 2px; }
+.goal-bar { height: 8px; border-radius: 8px; background: var(--paper); overflow: hidden; }
+.goal-bar i { display: block; height: 100%; border-radius: 8px; background: var(--effort); }
+.goal.reached .goal-bar i { background: var(--ok); }
+.goal-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.goal-foot .ok { color: var(--ok); }
+.goal-foot .late { color: var(--ink); }
+.m-val { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.m-val b { color: var(--ink); }

@@ -3,6 +3,7 @@
 import { LEGACY_KEY, LEGACY_PREFS_KEY } from '../config'
 import { db, DATA_TABLES, newId, DEFAULT_PROFILE } from './db'
 import { findByName, slug } from './exercises'
+import { migrateItems } from './sets'
 import type { Exercise, Food, Goal, Measure, MeasureKind, Plan, Profile, Workout } from './types'
 
 type Obj = Record<string, unknown>
@@ -101,7 +102,7 @@ export async function importLegacy() {
     const items = arr(pl.ex).flatMap(x =>
       x.c === 'course' || x.c === 'marche' ? [{ exerciseId: x.c }]
         : str(x.n) ? [{ exerciseId: exId(str(x.n)!), sets: num(x.s), technique: str(x.t, 40) }] : [])
-    return [{ weekday: +i, title: str(pl.name) ?? '', items, updatedAt: now }]
+    return [{ weekday: +i, title: str(pl.name) ?? '', items: migrateItems(items), updatedAt: now }]
   })
 
   const goals: Goal[] = arr(p.goals).flatMap(g => {
