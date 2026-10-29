@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#07080a">
 <link rel="apple-touch-icon" href="icon.png">
 <title>Suivi sport</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 :root{--bg:#07080a;--fg:#eef1f4;--mut:#7d8590;--card:#111317;--bd:#22262d;--acc:#29b6ff;--del:#ff6b6b;--fd:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
@@ -258,6 +258,29 @@ const fmt=d=>d.slice(8)+'/'+d.slice(5,7);
 const fmtL=d=>d.slice(8)+'/'+d.slice(5,7)+'/'+d.slice(0,4);
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 const LAB={bw:['Poids corporel','kg'],ventre:['Ventre','cm'],poitrine:['Poitrine','cm'],hanches:['Hanches','cm'],bras:['Bras','cm'],cuisse:['Cuisse','cm']};
+// Import : on ne garde que des champs connus, avec le bon type, pour qu'un fichier piégé ne puisse pas injecter de code
+function clean(p){
+  const o=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{},A=v=>Array.isArray(v)?v:[];
+  const st=(v,m=200)=>typeof v==='string'?v.slice(0,m):undefined,nb=v=>typeof v==='number'&&isFinite(v)?v:undefined;
+  const dt=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)?v:undefined,id=v=>typeof v==='string'&&/^[\w-]{1,40}$/.test(v)?v:uid();
+  const def=x=>{Object.keys(x).forEach(k=>x[k]===undefined&&delete x[k]);return x},SPT=['course','marche'];
+  const custom=A(p.custom).map(o).filter(c=>/^x[\w-]{1,40}$/.test(c.k)&&st(c.n)).map(c=>({k:c.k,n:st(c.n,60)}));
+  const bk=['bw','ventre','poitrine','hanches','bras','cuisse',...custom.map(c=>c.k)];
+  const r={
+    sets:A(p.sets).map(o).filter(s=>dt(s.d)&&st(s.ex)&&nb(s.w)!=null&&nb(s.r)!=null).map(s=>def({id:id(s.id),d:s.d,ex:st(s.ex),w:s.w,r:s.r,n:nb(s.n),m:nb(s.m)})),
+    runs:A(p.runs).map(o).filter(x=>dt(x.d)&&SPT.includes(x.type)).map(x=>def({id:id(x.id),d:x.d,type:x.type,km:nb(x.km),min:nb(x.min)})),
+    body:A(p.body).map(o).filter(b=>dt(b.d)).map(b=>{const e={id:id(b.id),d:b.d};bk.forEach(k=>{if(nb(b[k])!=null)e[k]=b[k]});return e}),
+    plan:{},chk:{},
+    goals:A(p.goals).map(o).filter(g=>st(g.k)&&nb(g.t)!=null&&dt(g.by)).map(g=>def({id:id(g.id),k:st(g.k),t:g.t,by:g.by,s:nb(g.s)??null,dir:g.dir==='down'?'down':'up',done:dt(g.done)})),
+    custom,myex:A(p.myex).map(x=>st(x,100)).filter(Boolean),
+    prof:(x=>def({age:nb(x.age),h:nb(x.h),sex:['f','h'].includes(x.sex)?x.sex:undefined,ws:Number.isInteger(x.ws)&&x.ws>=0&&x.ws<7?x.ws:undefined}))(o(p.prof)),
+    food:A(p.food).map(o).filter(f=>dt(f.d)).map(f=>def({id:id(f.id),d:f.d,n:st(f.n,100),kcal:nb(f.kcal),p:nb(f.p),g:nb(f.g),l:nb(f.l)})),
+    ng:(x=>({kcal:nb(x.kcal)??2000,p:nb(x.p)??100,g:nb(x.g)??250,l:nb(x.l)??70}))(o(p.ng))
+  };
+  Object.entries(o(p.plan)).forEach(([i,v])=>{if(!/^[0-6]$/.test(i))return;v=o(v);r.plan[i]={name:st(v.name,100)||'',ex:A(v.ex).map(o).map(x=>SPT.includes(x.c)?{c:x.c}:st(x.n)?def({n:st(x.n,100),s:nb(x.s)??3,t:st(x.t,40)}):null).filter(Boolean)}});
+  Object.keys(o(p.chk)).forEach(d=>{if(dt(d))r.chk[d]=1});
+  return r;
+}
 
 const COLORS=['#29b6ff','#39ff88','#ff7a1a','#ff5fa8','#1de9c6','#b794ff','#ffd84d','#a5c8ff','#ffc09a'],CN=['Bleu','Vert','Orange','Rose','Turquoise','Violet','Jaune','Bleu pastel','Orange pastel'];
 let P={};try{P=JSON.parse(localStorage.getItem('suivi-sport-prefs')||'{}')}catch(e){}
@@ -325,7 +348,7 @@ function renderCorps(){
   const pts=S.body.filter(b=>b[curM]!=null).sort((a,b)=>a.d.localeCompare(b.d)).map(b=>({x:b.d,y:b[curM]})),u=LAB[curM][1];
   $('b-out').innerHTML=pts.length?`<div class="card"><span class="mut">${LAB[curM][0]}</span><div class="big">${pts[pts.length-1].y} <small>${u}</small></div>${pts.length>1?pill(+(pts[pts.length-1].y-pts[0].y).toFixed(1),u):''}${chart(pts)}</div>`:'<p class="mut">Aucune mesure pour cette courbe.</p>';
   const rows=[...S.body].sort((a,b)=>b.d.localeCompare(a.d));
-  $('b-list').innerHTML=rows.length?'<div class="card">'+rows.map(b=>`<div class="li"><span><b>${fmtL(b.d)}</b><br><span class="mut">${Object.keys(LAB).filter(k=>b[k]!=null).map(k=>LAB[k][0]+' '+b[k]+' '+LAB[k][1]).join(', ')}</span></span><span class="v"><button class="x ed" data-edit-body="${b.id}" aria-label="Modifier">✎</button><button class="x" data-del-body="${b.id}" aria-label="Supprimer">×</button></span></div>`).join('')+'</div>':'';
+  $('b-list').innerHTML=rows.length?'<div class="card">'+rows.map(b=>`<div class="li"><span><b>${fmtL(b.d)}</b><br><span class="mut">${Object.keys(LAB).filter(k=>b[k]!=null).map(k=>esc(LAB[k][0])+' '+b[k]+' '+LAB[k][1]).join(', ')}</span></span><span class="v"><button class="x ed" data-edit-body="${b.id}" aria-label="Modifier">✎</button><button class="x" data-del-body="${b.id}" aria-label="Supprimer">×</button></span></div>`).join('')+'</div>':'';
 }
 function applyP(){
   document.documentElement.style.setProperty('--acc',P.c||COLORS[0]);document.documentElement.dataset.theme=P.th||'dark';$('u-th').innerHTML=chips([['dark','Sombre'],['light','Clair'],['auto','Automatique']],P.th||'dark','th');document.querySelector('meta[name=theme-color]').content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
@@ -384,7 +407,7 @@ $('d-imp').onclick=()=>{
     const p=JSON.parse($('d-txt').value);
     if(!Array.isArray(p.sets)||!Array.isArray(p.body))throw 0;
     if(!confirm('Remplacer toutes les données actuelles par celles du texte ?'))return;
-    S=Object.assign(DEF(),p);save();renderAll();$('d-msg').textContent='Import terminé.';
+    S=Object.assign(DEF(),clean(p));save();renderAll();$('d-msg').textContent='Import terminé.';
   }catch(e){$('d-msg').textContent="Texte invalide. Colle le contenu exporté depuis l'appli."}
 };
 const BANK={'Pectoraux':['Développé couché','Développé incliné haltères','Pompes','Écartés poulie','Dips'],'Dos':['Tractions','Rowing barre','Tirage vertical','Tirage horizontal','Soulevé de terre'],'Jambes':['Squat','Presse à cuisses','Fentes','Leg extension','Leg curl','Hip thrust','Mollets debout'],'Épaules':['Développé militaire','Élévations latérales','Oiseau','Face pull'],'Bras':['Curl barre','Curl marteau','Extension triceps poulie','Barre au front'],'Abdos':['Crunch','Gainage','Relevé de jambes']};
@@ -686,7 +709,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!
 $('chbtn').onclick=()=>go('chrono');
 (()=>{const c=P.ch||{w:30,r:15,n:8,p:5};['w','r','n','p'].forEach(k=>$('ch-'+k).value=c[k]);chTotal();chDraw();
   $('ch-note').textContent='Garde l\'appli ouverte pendant l\'exercice : si l\'écran s\'éteint, le chrono et les sons peuvent s\'arrêter.'+(navigator.wakeLock?'':' Ton navigateur ne peut pas garder l\'écran allumé tout seul.')+' Sur iPhone, le son peut être coupé quand le bouton silencieux est activé.'})();
-const APP_V='2026-10-09-a';
+const APP_V='2026-10-29-a';
 let dirty=false,lastChk=0;
 document.addEventListener('input',()=>{dirty=true},true);
 async function checkUpdate(){
