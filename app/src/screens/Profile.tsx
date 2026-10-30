@@ -9,7 +9,9 @@ import { applyTheme, type Theme } from '../lib/theme'
 import { ConfirmSheet, useToast } from '../components/ui'
 import { Mark } from '../components/Logo'
 import { GOALS, LEVELS, PROGRAMS } from '../data/programs'
-import { openPrograms } from '../lib/nav'
+import { openLegal, openPrograms } from '../lib/nav'
+import { AccountCard } from '../components/Account'
+import { accountsEnabled, signOut, useAccount } from '../lib/account'
 
 type Sheet = 'legacy' | 'erase' | 'restore' | 'paste' | null
 
@@ -25,6 +27,7 @@ export function Profile() {
   const [backup, setBackup] = useState<CheckedBackup | null>(null)
   const legacy = useMemo(legacySummary, [])
   const toast = useToast()
+  const account = useAccount()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(THEME_KEY) as Theme) || 'auto')
 
@@ -133,11 +136,15 @@ export function Profile() {
         <button className="link inline-link" style={{ justifySelf: 'start' }} onClick={() => saveProfile({ onboarded: false })}>Refaire le premier lancement</button>
       </section>
 
+      <AccountCard />
+
       <section className="card">
         <h2>Tes données</h2>
         <p className="sub">
-          Tout est enregistré uniquement sur ce téléphone : {counts?.workouts ?? 0} séances et {counts?.measures ?? 0} mesures.
-          Rien n'est envoyé sur internet. Pense à faire une sauvegarde de temps en temps.
+          {account.userId
+            ? `Sur ce téléphone : ${counts?.workouts ?? 0} séances et ${counts?.measures ?? 0} mesures, synchronisées avec ton compte.`
+            : `Tout est enregistré uniquement sur ce téléphone : ${counts?.workouts ?? 0} séances et ${counts?.measures ?? 0} mesures. Rien n'est envoyé sur internet.`}
+          {' '}Pense à faire une sauvegarde de temps en temps.
         </p>
         <button className="btn" onClick={exportData}>Exporter une sauvegarde</button>
         <label className="btn soft file-btn">
@@ -156,6 +163,12 @@ export function Profile() {
       <footer className="about">
         <Mark size={22} /><span>{APP_NAME} · version de test</span>
       </footer>
+      <nav className="legal-links" aria-label="Informations légales">
+        <button className="link" onClick={() => openLegal('confidentialite')}>Confidentialité</button>
+        <button className="link" onClick={() => openLegal('conditions')}>Conditions</button>
+        <button className="link" onClick={() => openLegal('mentions')}>Mentions légales</button>
+        <button className="link" onClick={() => openLegal('credits')}>Crédits</button>
+      </nav>
 
       {sheet === 'legacy' && (
         <ConfirmSheet
@@ -179,6 +192,7 @@ export function Profile() {
           title="Restaurer cette sauvegarde ?"
           text={(backup.source === 'suivi-sport' ? 'Sauvegarde de Suivi sport' : `Sauvegarde${backup.exportedAt ? ' du ' + longDate(backup.exportedAt.slice(0, 10)).toLowerCase() : ''}`) + ` : ${nb(backup.rows.workouts.length, 'séance')} et ${nb(backup.rows.measures.length, 'mesure')}. `
             + `Elle remplacera toutes les données actuelles de ${APP_NAME} (${nb(counts?.workouts ?? 0, 'séance')}).`
+            + (account.userId ? ' Ton compte sera mis à jour lui aussi.' : '')
             + (backup.skipped ? ` ${backup.skipped} élément${backup.skipped > 1 ? 's' : ''} illisible${backup.skipped > 1 ? 's' : ''} ser${backup.skipped > 1 ? 'ont' : 'a'} ignoré${backup.skipped > 1 ? 's' : ''}.` : '')}
           confirmLabel="Restaurer"
           onClose={() => { setSheet(null); setBackup(null) }}
@@ -193,10 +207,11 @@ export function Profile() {
         <ConfirmSheet
           danger
           title="Supprimer toutes tes données ?"
-          text={`Séances, mesures, nutrition, planning et profil seront effacés de ce téléphone. C'est définitif. Exporte une sauvegarde avant si tu veux les garder. Suivi sport n'est pas touchée.`}
+          text={`Séances, mesures, photos, nutrition, planning et profil seront effacés de ce téléphone. C'est définitif. Exporte une sauvegarde avant si tu veux les garder. Suivi sport n'est pas touchée.`
+            + (account.userId ? ' Tu seras déconnecté de ton compte, dont les données restent sur le serveur : pour les effacer, supprime ton compte.' : '')}
           confirmLabel="Tout supprimer"
           onClose={() => setSheet(null)}
-          onConfirm={async () => { await eraseAll(); pickTheme('auto'); setSheet(null); toast('Toutes tes données ont été supprimées') }}
+          onConfirm={async () => { if (accountsEnabled) await signOut(); await eraseAll(); pickTheme('auto'); setSheet(null); toast('Toutes tes données ont été supprimées') }}
         />
       )}
       <style>{'.file-btn{position:relative;text-align:center;cursor:pointer}.file-btn input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.file-btn:focus-within{outline:2px solid var(--effort);outline-offset:3px}.inline-link{padding:0;font:inherit;color:var(--ink);text-decoration:underline}.paste{min-height:140px;font:500 .8rem var(--f-data);resize:vertical}.about{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--mute);font-size:.8rem;padding:8px 0}'}</style>

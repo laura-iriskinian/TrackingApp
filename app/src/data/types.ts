@@ -52,6 +52,7 @@ export interface Workout {
   entries: Entry[]
   exerciseIds: string[] // index pour retrouver vite l'historique d'un exercice
   note?: string
+  deload?: boolean // faite pendant une semaine allégée : ignorée pour proposer la charge suivante
   updatedAt: number
 }
 
@@ -94,6 +95,30 @@ export interface Plan {
   updatedAt: number
 }
 
+// Modèle de séance réutilisable : sert à remplir un jour du planning ou à lancer une séance
+export interface Template {
+  id: string
+  title: string
+  items: PlanItem[]
+  updatedAt: number
+}
+
+// Photo de progression : privée, gardée sur ce téléphone seulement (ni sauvegarde, ni synchronisation)
+export interface Photo {
+  id: string
+  date: string
+  pose: 'face' | 'profil' | 'dos'
+  blob: Blob
+  updatedAt: number
+}
+
+// Cycle de plusieurs semaines : la dernière peut être allégée (deload) pour récupérer
+export interface Cycle {
+  start: string // premier jour de la première semaine
+  weeks: number
+  deload: boolean
+}
+
 export interface Goal {
   id: string
   metric: string // ex. 'max-weight:squat', 'distance:course', 'measure:weight'
@@ -116,6 +141,7 @@ export interface Profile {
   place?: Place
   program?: string // programme tout prêt appliqué au planning
   onboarded?: boolean // false : premier lancement à refaire
+  cycle?: Cycle
   age?: number
   heightCm?: number
   sex?: 'f' | 'h'

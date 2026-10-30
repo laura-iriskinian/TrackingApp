@@ -10,8 +10,9 @@ import { LineChart } from '../components/LineChart'
 import { MuscleMap } from '../components/MuscleMap'
 import { Body } from './Body'
 import { Goals } from './Goals'
+import { Photos } from './Photos'
 
-type Part = 'exercices' | 'corps' | 'objectifs'
+type Part = 'exercices' | 'corps' | 'photos' | 'objectifs'
 const PART_KEY = 'nextrep-progres'
 
 export function Progress() {
@@ -26,11 +27,11 @@ export function Progress() {
     <div className="screen">
       <header className="head"><h1>Progrès</h1></header>
       <div className="seg" role="group" aria-label="Partie">
-        {([['exercices', 'Exercices'], ['corps', 'Corps'], ['objectifs', 'Objectifs']] as const).map(([v, l]) => (
+        {([['exercices', 'Exercices'], ['corps', 'Corps'], ['photos', 'Photos'], ['objectifs', 'Objectifs']] as const).map(([v, l]) => (
           <button key={v} aria-pressed={part === v} onClick={() => pick(v)}>{l}</button>
         ))}
       </div>
-      {part === 'exercices' ? <Exercises /> : part === 'corps' ? <Body /> : <Goals />}
+      {part === 'exercices' ? <Exercises /> : part === 'corps' ? <Body /> : part === 'photos' ? <Photos /> : <Goals />}
     </div>
   )
 }

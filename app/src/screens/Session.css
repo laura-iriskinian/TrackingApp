@@ -223,3 +223,28 @@
 .ob-alt { margin: 0 -16px; padding: 0 16px 2px; }
 .ob-alt button { background: var(--surface); }
 .plan-target { width: 120px; padding: 8px 10px; text-align: right; font-size: .9rem; }
+
+/* Compte et pages légales */
+.check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; font-size: .88rem; line-height: 1.45; }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--ink); }
+.acc-legal { justify-self: start; }
+.acc-code { font: 700 1.5rem var(--f-data); letter-spacing: .3em; text-align: center; }
+.acc-error { color: var(--effort); font-weight: 600; }
+.acc-mail { color: var(--ink); font-weight: 600; word-break: break-all; }
+.legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 14px; margin-top: -8px; }
+.legal-links .link { color: var(--mute); font-size: .8rem; font-weight: 500; }
+.legal-text { gap: 10px; }
+.legal-text h2 { font-size: 1.05rem; margin-top: 8px; }
+.legal-text h2:first-child { margin-top: 0; }
+.legal-text p, .legal-text li { font-size: .92rem; color: var(--ink); }
+.legal-text ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.legal-text a { color: var(--ink); }
+.licence { white-space: pre-wrap; font: 500 .7rem/1.5 var(--f-data); color: var(--mute); background: var(--paper); border-radius: var(--r-md); padding: 12px; margin: 0; overflow-wrap: anywhere; }
+
+/* Modèles et cycle */
+.plan-tpl { justify-content: center; margin-top: -6px; }
+.pick.tpl { flex-direction: column; gap: 2px; }
+.pick.tpl .data { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-row .pick.tpl { min-width: 0; }
+.tpl-del { color: var(--effort); }
+.deload-note { color: var(--effort); }

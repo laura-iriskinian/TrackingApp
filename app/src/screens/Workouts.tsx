@@ -1,4 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useState } from 'react'
+import { TemplatePicker } from '../components/Templates'
 import { allExercises, db } from '../data/db'
 import { longDate, MONTHS, parse } from '../lib/dates'
 import { entrySummary } from '../lib/summary'
@@ -10,6 +12,7 @@ export function Workouts() {
   const exercises = useLiveQuery(allExercises) ?? []
   const exById = (id: string) => exercises.find(e => e.id === id)
   const active = useLiveQuery(getSession)
+  const [tpl, setTpl] = useState(false)
   const start = async () => {
     if (!active) await startSession(undefined, [], exercises)
     openSession()
@@ -31,6 +34,7 @@ export function Workouts() {
         </div>
       </header>
       <button className="btn go" onClick={start}>{active ? 'Reprendre la séance en cours' : 'Nouvelle séance'}</button>
+      {!active && <button className="btn soft" onClick={() => setTpl(true)}>Partir d'un modèle</button>}
       <button className="btn soft" onClick={() => openWorkoutEdit()}>Ajouter une séance passée</button>
       <div className="row">
         <button className="btn soft" onClick={openPrograms}>Programmes</button>
@@ -45,6 +49,11 @@ export function Workouts() {
             Si tu utilises Suivi sport sur ce téléphone, tu peux récupérer ton historique depuis l'onglet Profil.
           </p>
         </section>
+      )}
+
+      {tpl && (
+        <TemplatePicker title="Lancer un modèle" onClose={() => setTpl(false)}
+          onPick={async t => { setTpl(false); await startSession(t.title, t.items, exercises); openSession() }} />
       )}
 
       {[...byMonth].map(([month, list]) => (

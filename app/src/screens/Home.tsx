@@ -8,6 +8,7 @@ import { MUSCLE_LABEL } from '../data/exercises'
 import type { Muscle } from '../data/types'
 import { recovery } from '../lib/recovery'
 import { streak } from '../lib/streak'
+import { cycleWeek } from '../lib/cycle'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
 import { getSession, startSession } from '../data/session'
@@ -43,6 +44,7 @@ export function Home() {
   const sessionsThisMonth = recent.filter(w => w.date.startsWith(month)).length
   const weekVolume = recent.filter(w => w.date >= weekStart).reduce((a, w) => a + w.entries.reduce((b, e) => b + volume(e.sets), 0), 0)
 
+  const cyc = cycleWeek(profile?.cycle, t)
   const plan = planOf(t)
   const planEx = plan?.items.map(i => exById(i.exerciseId)) ?? []
   const muscles = musclesOf(planEx)
@@ -114,7 +116,8 @@ export function Home() {
             <div>
               <span className="eyebrow">Séance du jour</span>
               <h2>{plan.title || 'Séance prévue'}</h2>
-              <span className="sub">{plan.items.length} exercice{plan.items.length > 1 ? 's' : ''}</span>
+              <span className="sub">{plan.items.length} exercice{plan.items.length > 1 ? 's' : ''}{cyc ? ` · semaine ${cyc.week} sur ${cyc.total}` : ''}</span>
+              {cyc?.deload && <span className="sub deload-note">Semaine allégée : moins de séries, charges plus légères.</span>}
             </div>
             <div className="today-figs">
               <MuscleMap view="front" primary={muscles.primary} secondary={muscles.secondary} className="today-fig" />

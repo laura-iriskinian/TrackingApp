@@ -1,4 +1,5 @@
-import { db, newId } from './db'
+import { db, getProfile, newId } from './db'
+import { cycleWeek, deloadEntry } from '../lib/cycle'
 import type { Entry, Exercise, PlanItem, SetLog, Workout } from './types'
 import { today } from '../lib/dates'
 
@@ -13,6 +14,7 @@ export interface ActiveSession {
   cur: number // exercice affiché
   restEndsAt?: number
   restTotal?: number // durée du repos en cours, en secondes
+  deload?: boolean // semaine allégée du cycle
 }
 
 const KEY = 'session'
@@ -25,10 +27,11 @@ export async function getSession(): Promise<ActiveSession | undefined> {
 export const saveSession = (s: ActiveSession) => db.kv.put({ key: KEY, value: s })
 export const dropSession = () => db.kv.delete(KEY)
 
-// Séries de la dernière séance où l'exercice a été fait
+// Séries de la dernière séance où l'exercice a été fait. Les séances de semaine allégée sont passées.
 export async function lastSets(exerciseId: string): Promise<SetLog[]> {
   const list = await db.workouts.where('exerciseIds').equals(exerciseId).sortBy('date')
   for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].deload) continue
     const e = list[i].entries.find(x => x.exerciseId === exerciseId)
     if (e?.sets.length) return e.sets
   }
@@ -57,12 +60,17 @@ export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, '
 }
 
 export async function startSession(title: string | undefined, items: PlanItem[], exercises: Exercise[]) {
+  const deload = !!cycleWeek((await getProfile()).cycle, today())?.deload
   const entries: Entry[] = []
   for (const it of items) {
     const ex = exercises.find(e => e.id === it.exerciseId)
-    if (ex) entries.push(buildEntry(ex, await lastSets(ex.id), it))
+    if (ex) {
+      const e = buildEntry(ex, await lastSets(ex.id), it)
+      entries.push(deload ? deloadEntry(e) : e)
+    }
   }
   const s: ActiveSession = { id: newId(), date: today(), title, startedAt: Date.now(), entries, cur: 0 }
+  if (deload) s.deload = true
   await saveSession(s)
   return s
 }
@@ -126,6 +134,7 @@ export async function finishSession(s: ActiveSession): Promise<Workout | null> {
     exerciseIds: [...new Set(entries.map(e => e.exerciseId))],
     updatedAt: Date.now(),
   }
+  if (s.deload) w.deload = true
   await db.transaction('rw', db.workouts, db.kv, async () => {
     // Le même jour, l'ancienne app regroupait tout dans une séance : on fait pareil pour ne pas dédoubler l'historique
     const same = await db.workouts.where('date').equals(s.date).first()

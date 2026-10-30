@@ -13,3 +13,5 @@ export const openPlanning = () => open('#planning')
 export const openTimer = () => open('#chrono')
 export const openExercises = () => open('#exercices')
 export const openPrograms = () => open('#programmes')
+// Informations légales : confidentialite, conditions, mentions ou credits
+export const openLegal = (section = 'confidentialite') => open('#infos/' + section)

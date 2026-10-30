@@ -11,6 +11,7 @@ import { Timer } from './screens/Timer'
 import { Exercises } from './screens/Exercises'
 import { Programs } from './screens/Programs'
 import { Onboarding } from './screens/Onboarding'
+import { Legal } from './screens/Legal'
 import { db, getProfile } from './data/db'
 import { backTo } from './lib/nav'
 import { ToastProvider } from './components/ui'
@@ -22,11 +23,11 @@ const TABS = [
   { id: 'profil', label: 'Profil', icon: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, Screen: Profile },
 ] as const
 
-type TabId = (typeof TABS)[number]['id'] | 'seance' | 'planning' | 'chrono' | 'exercices' | 'programmes' | `seance-passee${string}`
+type TabId = (typeof TABS)[number]['id'] | 'seance' | 'planning' | 'chrono' | 'exercices' | 'programmes' | `seance-passee${string}` | `infos${string}`
 const FULL = ['seance', 'planning', 'chrono', 'exercices', 'programmes']
 const fromHash = (): TabId => {
   const h = location.hash.slice(1)
-  if (FULL.includes(h) || h === 'seance-passee' || h.startsWith('seance-passee/')) return h as TabId
+  if (FULL.includes(h) || h === 'seance-passee' || h.startsWith('seance-passee/') || h.startsWith('infos')) return h as TabId
   return TABS.find(t => t.id === h)?.id ?? 'accueil'
 }
 
@@ -51,6 +52,8 @@ export default function App() {
   }
 
   const full = (node: ReactNode) => <ToastProvider><main>{node}</main></ToastProvider>
+  // Les pages légales restent lisibles pendant le premier lancement
+  if (tab.startsWith('infos')) return full(<Legal section={tab.split('/')[1]} onClose={() => go(backTo('profil') as TabId)} />)
   if (onboarding === undefined) return null
   if (onboarding) return full(<Onboarding />)
   if (tab === 'seance') return full(<Session onClose={() => go('accueil')} />)

@@ -3,7 +3,7 @@
 import { db, DATA_TABLES, mergeIntoCatalog } from './db'
 import { migrateEntries, migrateItems, SET_TYPES } from './sets'
 import type {
-  Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetType, Workout,
+  Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetType, Template, Workout,
 } from './types'
 import { MUSCLE_LABEL } from './exercises'
 import { convertLegacy, isLegacyExport } from './legacy'
@@ -45,13 +45,23 @@ function entry(v: unknown): (Entry & { technique?: string }) | undefined {
   return pick({ exerciseId: id(v.exerciseId)!, group: id(v.group), target: str(v.target, 20), technique: str(v.technique, 40), sets: sets as SetLog[] })
 }
 
-const ROWS = {
+// Exercices prévus (planning, modèles) : la liste entière est écartée si un élément est invalide
+function planItems(v: unknown): PlanItem[] | undefined {
+  const items = list(v, 50)?.map((x): (PlanItem & { technique?: string }) | undefined => {
+    if (!isObj(x) || !id(x.exerciseId)) return
+    const types = list(x.types, 50)?.map(t => (t === null ? null : oneOf(t, SET_TYPE_IDS) ?? null)) as (SetType | null)[] | undefined
+    return pick({ exerciseId: id(x.exerciseId)!, sets: num(x.sets, 1, 50), types, group: id(x.group), target: str(x.target, 20), technique: str(x.technique, 40) })
+  })
+  return items && !items.some(x => !x) ? migrateItems(items as PlanItem[]) : undefined
+}
+
+export const ROWS = {
   workouts(v: Obj): Workout | undefined {
     const entries = list(v.entries, 200)?.map(entry)
     if (!id(v.id) || !date(v.date) || !entries || entries.some(e => !e)) return
     const es = migrateEntries(entries as Entry[])
     return pick({
-      id: id(v.id)!, date: date(v.date)!, title: str(v.title, 100), note: str(v.note, 2000), entries: es,
+      id: id(v.id)!, date: date(v.date)!, title: str(v.title, 100), note: str(v.note, 2000), entries: es, deload: v.deload === true ? true : undefined,
       exerciseIds: [...new Set(es.map(e => e.exerciseId))], updatedAt: time(v.updatedAt),
     })
   },
@@ -78,13 +88,13 @@ const ROWS = {
   },
   plans(v: Obj): Plan | undefined {
     const weekday = num(v.weekday, 0, 6)
-    const items = list(v.items, 50)?.map((x): (PlanItem & { technique?: string }) | undefined => {
-      if (!isObj(x) || !id(x.exerciseId)) return
-      const types = list(x.types, 50)?.map(t => (t === null ? null : oneOf(t, SET_TYPE_IDS) ?? null)) as (SetType | null)[] | undefined
-      return pick({ exerciseId: id(x.exerciseId)!, sets: num(x.sets, 1, 50), types, group: id(x.group), target: str(x.target, 20), technique: str(x.technique, 40) })
-    })
-    if (weekday == null || !Number.isInteger(weekday) || !items || items.some(x => !x)) return
-    return { weekday, title: str(v.title, 100) ?? '', items: migrateItems(items as PlanItem[]), updatedAt: time(v.updatedAt) }
+    const items = planItems(v.items)
+    if (weekday == null || !Number.isInteger(weekday) || !items) return
+    return { weekday, title: str(v.title, 100) ?? '', items, updatedAt: time(v.updatedAt) }
+  },
+  templates(v: Obj): Template | undefined {
+    const items = planItems(v.items), title = str(v.title, 100)
+    return id(v.id) && title && items ? { id: id(v.id)!, title, items, updatedAt: time(v.updatedAt) } : undefined
   },
   goals(v: Obj): Goal | undefined {
     const metric = typeof v.metric === 'string' && /^(max-weight|distance|duration|measure):[\w.:-]{1,80}$/.test(v.metric) ? v.metric : undefined
@@ -124,8 +134,13 @@ const ROWS = {
         plates: list(p.plates, 20)?.filter((x): x is number => num(x, 0.1, 50) != null),
         pauseWeeks: list(p.pauseWeeks, 1000)?.filter((x): x is string => !!date(x)),
         reminderTime: typeof p.reminderTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(p.reminderTime) ? p.reminderTime : undefined,
-        nutritionTargets: pick({ kcal: num(nt.kcal, 0, 20000), protein: num(nt.protein, 0, 2000), carbs: num(nt.carbs, 0, 2000), fat: num(nt.fat, 0, 2000) }) as Profile['nutritionTargets'],
       })
+      // Objectifs de nutrition : repris seulement s'ils sont complets, sinon ceux par défaut s'appliquent
+      const targets = pick({ kcal: num(nt.kcal, 0, 20000), protein: num(nt.protein, 0, 2000), carbs: num(nt.carbs, 0, 2000), fat: num(nt.fat, 0, 2000) })
+      const c = isObj(p.cycle) ? p.cycle : undefined
+      const weeks = num(c?.weeks, 2, 12)
+      if (c && date(c.start) && weeks != null && Number.isInteger(weeks)) value.cycle = { start: date(c.start)!, weeks, deload: c.deload === true }
+      if (Object.keys(targets).length === 4) value.nutritionTargets = targets as Profile['nutritionTargets']
       return { key: 'profile', value }
     }
   },
@@ -187,6 +202,7 @@ export async function restoreBackup(b: CheckedBackup) {
     await db.goals.bulkPut(b.rows.goals)
     await db.exercises.bulkPut(b.rows.exercises)
     await db.notes.bulkPut(b.rows.notes)
+    await db.templates.bulkPut(b.rows.templates)
     await db.kv.bulkPut(b.rows.kv)
     await mergeIntoCatalog(n => db.table(n))
   })

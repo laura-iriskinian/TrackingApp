@@ -51,7 +51,7 @@ describe('sauvegarde NextRep', () => {
       },
     }))
     expect(b.rows.workouts).toEqual([{ id: 'ok', date: '2026-10-01', entries: [{ exerciseId: 'squat', sets: [{ weight: 60, reps: 8, done: true }] }], exerciseIds: ['squat'], updatedAt: 1 }])
-    expect(b.rows.kv).toEqual([{ key: 'profile', value: { name: 'L', nutritionTargets: {} } }])
+    expect(b.rows.kv).toEqual([{ key: 'profile', value: { name: 'L' } }])
     // 3 séances invalides et la séance en cours ; les champs invalides du profil sont seulement ignorés
     expect(b.skipped).toBe(4)
   })

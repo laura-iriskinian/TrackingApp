@@ -1,11 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
-import { allExercises, db, getProfile, saveProfile } from '../data/db'
+import { allExercises, db, getProfile, newId, saveProfile } from '../data/db'
+import { TemplatePicker } from '../components/Templates'
+import { useToast } from '../components/ui'
+import { cycleWeek } from '../lib/cycle'
 import { APP_NAME } from '../config'
 import { remindersIcs } from '../lib/ics'
 import { newGroupId, SET_TYPES } from '../data/sets'
 import type { Exercise, Plan, PlanItem, SetType } from '../data/types'
-import { DAYS, today, weekday } from '../lib/dates'
+import { DAYS, today, weekday, weekStartOf } from '../lib/dates'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { PROGRAMS } from '../data/programs'
@@ -30,6 +33,8 @@ export function Planning({ onClose }: { onClose: () => void }) {
   const exercises = useLiveQuery(allExercises) ?? []
   const [picking, setPicking] = useState(false)
   const [info, setInfo] = useState<Exercise | null>(null)
+  const [tpl, setTpl] = useState(false)
+  const toast = useToast()
   const profile = useLiveQuery(getProfile)
   if (!plans || !profile) return null
 
@@ -84,6 +89,16 @@ export function Planning({ onClose }: { onClose: () => void }) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000)
   }
   const program = PROGRAMS.find(p => p.id === profile.program)
+  const saveTemplate = async () => {
+    const title = plan.title || DAYS[day]
+    const same = await db.templates.filter(t => t.title === title).first()
+    await db.templates.put({ id: same?.id ?? newId(), title, items: plan.items.map(x => ({ ...x })), updatedAt: Date.now() })
+    toast(same ? `Modèle « ${title} » mis à jour` : `Modèle « ${title} » enregistré`)
+  }
+  const cyc = cycleWeek(profile.cycle, today())
+  const setCycle = (patch: Partial<NonNullable<typeof profile.cycle>> | null) => saveProfile({
+    cycle: patch === null ? undefined : { start: profile.cycle?.start ?? weekStartOf(today(), profile.weekStart), weeks: 4, deload: true, ...profile.cycle, ...patch },
+  })
   const count = (d: number) => plans.find(p => p.weekday === d)?.items.length ?? 0
 
   return (
@@ -186,6 +201,37 @@ export function Planning({ onClose }: { onClose: () => void }) {
         <section className="card"><p className="sub">Aucun exercice prévu : c'est un jour de repos.</p></section>
       )}
       <button className="btn soft" onClick={() => setPicking(true)}>+ Ajouter un exercice</button>
+      <div className="row cur-tools plan-tpl">
+        <button className="link" onClick={() => setTpl(true)}>Partir d'un modèle</button>
+        {plan.items.length > 0 && <button className="link" onClick={saveTemplate}>Enregistrer comme modèle</button>}
+      </div>
+
+      <section className="card">
+        <h2>Cycle</h2>
+        <p className="sub">
+          {profile.cycle
+            ? `Semaine ${cyc?.week ?? 1} sur ${profile.cycle.weeks}.` + (profile.cycle.deload ? ' La dernière semaine est allégée : moitié moins de séries, charges à 60 %, pour récupérer avant de repartir plus fort.' : '') + ' Le cycle recommence ensuite.'
+            : 'Organise tes semaines en cycles, avec une semaine allégée à la fin pour récupérer.'}
+        </p>
+        {profile.cycle ? (
+          <>
+            <div className="field">
+              <span className="sub" id="cy-l">Durée du cycle</span>
+              <div className="seg" role="group" aria-labelledby="cy-l">
+                {[3, 4, 5, 6].map(n => <button key={n} aria-pressed={profile.cycle!.weeks === n} onClick={() => setCycle({ weeks: n })}>{n} sem.</button>)}
+              </div>
+            </div>
+            <label className="check">
+              <input type="checkbox" checked={profile.cycle.deload} onChange={e => setCycle({ deload: e.target.checked })} />
+              <span>Dernière semaine allégée</span>
+            </label>
+            <div className="row cur-tools">
+              <button className="link" onClick={() => setCycle({ start: weekStartOf(today(), profile.weekStart) })}>Recommencer cette semaine</button>
+              <button className="link" onClick={() => setCycle(null)}>Arrêter le cycle</button>
+            </div>
+          </>
+        ) : <button className="btn soft" onClick={() => setCycle({})}>Commencer un cycle de 4 semaines</button>}
+      </section>
 
       <section className="card">
         <h2>Rappels</h2>
@@ -202,6 +248,10 @@ export function Planning({ onClose }: { onClose: () => void }) {
         <button className="btn soft" disabled={!planned.length} onClick={exportReminders}>Ajouter à mon agenda</button>
       </section>
 
+      {tpl && (
+        <TemplatePicker title={`Modèle pour le ${DAYS[day].toLowerCase()}`} onClose={() => setTpl(false)}
+          onPick={t => { save({ title: t.title, items: t.items.map(x => ({ ...x })) }); setTpl(false); toast(`« ${t.title} » prévu le ${DAYS[day].toLowerCase()}`) }} />
+      )}
       {info && <ExerciseSheet ex={info} onClose={() => setInfo(null)} />}
       {picking && (
         <ExercisePicker exercises={exercises} exclude={plan.items.map(x => x.exerciseId)} onPick={add} onClose={() => setPicking(false)} />

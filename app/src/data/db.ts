@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie'
-import type { Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Plan, Profile, Workout } from './types'
+import type { Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Photo, Plan, Profile, Template, Workout } from './types'
 import { CATALOG, norm } from './exercises'
 import { migrateEntries, migrateItems } from './sets'
 
@@ -13,6 +13,9 @@ export const db = new Dexie('nextrep') as Dexie & {
   exercises: EntityTable<Exercise, 'id'> // exercices créés par l'utilisateur
   notes: EntityTable<ExerciseNote, 'exerciseId'> // note gardée d'une séance à l'autre
   kv: EntityTable<KV, 'key'>
+  sync: EntityTable<KV, 'key'> // état de la synchronisation, propre à cet appareil (jamais exporté)
+  templates: EntityTable<Template, 'id'>
+  photos: EntityTable<Photo, 'id'> // jamais exportées ni synchronisées
 }
 
 db.version(1).stores({
@@ -39,6 +42,12 @@ db.version(2).stores({ notes: 'exerciseId' }).upgrade(async tx => {
 // Version 3 : catalogue élargi. Un exercice créé par l'utilisateur qui porte le nom d'un nouvel exercice
 // du catalogue est fusionné avec lui, pour garder un seul historique.
 db.version(3).stores({}).upgrade(tx => mergeIntoCatalog(n => tx.table(n)))
+
+// Version 4 : comptes et synchronisation
+db.version(4).stores({ sync: 'key' })
+
+// Version 5 : modèles de séances, photos de progression
+db.version(5).stores({ templates: 'id', photos: 'id, date' })
 
 export async function mergeIntoCatalog(table: (name: string) => Table) {
   const map = new Map<string, string>()
@@ -67,7 +76,7 @@ export async function mergeIntoCatalog(table: (name: string) => Table) {
   await table('exercises').bulkDelete([...map.keys()])
 }
 
-export const DATA_TABLES = [db.workouts, db.measures, db.measureKinds, db.foods, db.plans, db.goals, db.exercises, db.notes, db.kv]
+export const DATA_TABLES = [db.workouts, db.measures, db.measureKinds, db.foods, db.plans, db.goals, db.exercises, db.notes, db.templates, db.kv]
 
 export const newId = () => crypto.randomUUID()
 
@@ -117,5 +126,7 @@ export async function eraseAll() {
   await db.transaction('rw', DATA_TABLES, async () => {
     for (const t of DATA_TABLES) await t.clear()
   })
+  await db.sync.clear()
+  await db.photos.clear()
   for (const k of Object.keys(localStorage)) if (k.startsWith('nextrep')) localStorage.removeItem(k)
 }

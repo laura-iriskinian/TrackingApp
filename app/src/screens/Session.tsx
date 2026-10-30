@@ -170,7 +170,7 @@ export function Session({ onClose }: { onClose: () => void }) {
       </header>
 
       <div className="head">
-        <span className="sub">{done} série{done > 1 ? 's' : ''} sur {total}</span>
+        <span className="sub">{done} série{done > 1 ? 's' : ''} sur {total}{s.deload ? ' · semaine allégée' : ''}</span>
         <h1>{s.title || 'Séance libre'}</h1>
         <div className="ses-progress" aria-hidden="true"><i style={{ width: total ? (done / total) * 100 + '%' : 0 }} /></div>
       </div>
@@ -281,7 +281,7 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
   const hasMap = primary.length + secondary.length > 0
   // Progression proposée au début de l'exercice, tant que rien n'a été validé et que la charge n'a pas été changée
   const started = entry.sets.some(x => x.done && isWork(x))
-  const sug = !cardio && set && isWork(set) && !started && last ? suggestNext(last) : null
+  const sug = !cardio && !s.deload && set && isWork(set) && !started && last ? suggestNext(last) : null
   const showSug = sug && (sug.weight !== values.weight || sug.reps !== values.reps)
   const workWeight = entry.sets.find(x => isWork(x) && x.weight)?.weight
   const canWarmup = !cardio && !entry.sets.some(x => x.done || x.type === 'warmup') && workWeight != null && warmupSets(workWeight, barKg).length > 0
