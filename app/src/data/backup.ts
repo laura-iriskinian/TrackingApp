@@ -61,7 +61,7 @@ export const ROWS = {
     if (!id(v.id) || !date(v.date) || !entries || entries.some(e => !e)) return
     const es = migrateEntries(entries as Entry[])
     return pick({
-      id: id(v.id)!, date: date(v.date)!, title: str(v.title, 100), note: str(v.note, 2000), entries: es, deload: v.deload === true ? true : undefined,
+      id: id(v.id)!, date: date(v.date)!, title: str(v.title, 100), note: str(v.note, 2000), entries: es, deload: v.deload === true ? true : undefined, forDate: date(v.forDate),
       exerciseIds: [...new Set(es.map(e => e.exerciseId))], updatedAt: time(v.updatedAt),
     })
   },
@@ -129,7 +129,7 @@ export const ROWS = {
         name: str(p.name, 40), goal: oneOf(p.goal, ['muscle', 'fit', 'loss'] as const), level: oneOf(p.level, ['beginner', 'trained'] as const),
         place: oneOf(p.place, ['gym', 'home'] as const), program: id(p.program), onboarded: typeof p.onboarded === 'boolean' ? p.onboarded : undefined,
         age: num(p.age, 1, 120), heightCm: num(p.heightCm, 50, 260), sex: oneOf(p.sex, ['f', 'h'] as const),
-        weekStart: num(p.weekStart, 0, 6), restSec: num(p.restSec, 0, 1800), effortMode: oneOf(p.effortMode, ['off', 'simple', 'rpe', 'rir'] as const),
+        weekStart: num(p.weekStart, 0, 6), restSec: num(p.restSec, 0, 1800), restExSec: num(p.restExSec, 0, 1800), effortMode: oneOf(p.effortMode, ['off', 'simple', 'rpe', 'rir'] as const),
         barKg: num(p.barKg, 0, 50), weeklyTarget: num(p.weeklyTarget, 1, 14),
         plates: list(p.plates, 20)?.filter((x): x is number => num(x, 0.1, 50) != null),
         pauseWeeks: list(p.pauseWeeks, 1000)?.filter((x): x is string => !!date(x)),

@@ -2,8 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { allExercises, db, getProfile, saveProfile } from '../data/db'
 import { importLegacy, legacySummary } from '../data/legacy'
-import { addDays, DAYS, fmtThousands, longDate, parse, today, weekday, weekStartOf } from '../lib/dates'
-import { musclesOf, planLine, volume } from '../lib/summary'
+import { addDays, DAYS, fmtThousands, longDate, MONTHS, parse, today, weekday, weekStartOf } from '../lib/dates'
+import { entrySummary, musclesOf, planLine, volume } from '../lib/summary'
 import { MUSCLE_LABEL } from '../data/exercises'
 import type { Muscle } from '../data/types'
 import { recovery } from '../lib/recovery'
@@ -12,7 +12,7 @@ import { cycleWeek } from '../lib/cycle'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
 import { getSession, startSession } from '../data/session'
-import { openPlanning, openPrograms, openSession } from '../lib/nav'
+import { openPlanning, openPrograms, openSession, openWorkoutAdd, openWorkoutEdit } from '../lib/nav'
 import './Home.css'
 
 export function Home() {
@@ -26,13 +26,22 @@ export function Home() {
   const toast = useToast()
   const [importing, setImporting] = useState(false)
   const active = useLiveQuery(getSession)
+  const [picked, setPicked] = useState<string | null>(null)
+  const sel = picked ?? t
 
   const exById = (id: string) => exercises.find(e => e.id === id)
-  const doneDays = new Set(recent.map(w => w.date))
   const planOf = (d: string) => plans.find(p => p.weekday === weekday(d) && (p.title || p.items.length))
 
   const weekStart = weekStartOf(t, profile?.weekStart ?? 0)
-  const week = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const shownStart = weekStartOf(sel, profile?.weekStart ?? 0)
+  const week = Array.from({ length: 7 }, (_, i) => addDays(shownStart, i))
+  const shown = useLiveQuery(() => db.workouts.where('date').between(week[0], week[6], true, true).toArray(), [week[0]]) ?? []
+  // Séance faite pour ce jour : le jour même, ou décalée à un autre jour. Une séance décalée
+  // sur un jour qui a sa propre séance prévue ne compte pas pour lui : elle reste à faire.
+  const doneFor = (d: string) => {
+    const w = shown.find(x => x.date === d)
+    return w && !(w.forDate && w.forDate !== d && planOf(d)) ? w : recent.find(x => x.forDate === d)
+  }
   const month = t.slice(0, 7)
   const allDates = useLiveQuery(async () => (await db.workouts.orderBy('date').keys()) as string[]) ?? []
   const target = profile?.weeklyTarget ?? 3
@@ -45,12 +54,13 @@ export function Home() {
   const weekVolume = recent.filter(w => w.date >= weekStart).reduce((a, w) => a + w.entries.reduce((b, e) => b + volume(e.sets), 0), 0)
 
   const cyc = cycleWeek(profile?.cycle, t)
-  const plan = planOf(t)
+  const plan = planOf(sel)
+  const worked = sel !== t ? doneFor(sel) : undefined
   const planEx = plan?.items.map(i => exById(i.exerciseId)) ?? []
   const muscles = musclesOf(planEx)
 
   const start = async (title?: string, items = plan?.items ?? []) => {
-    if (!active) await startSession(title, items, exercises)
+    if (!active) await startSession(title, items, exercises, sel !== t ? sel : undefined)
     openSession()
   }
 
@@ -95,26 +105,49 @@ export function Home() {
         </section>
       )}
 
-      <section className="card" aria-label="Cette semaine">
+      <section className="card" aria-label="Agenda">
+        <div className="week-nav">
+          <button className="link" aria-label="Semaine précédente" onClick={() => setPicked(addDays(sel, -7))}>‹</button>
+          <span className="sub">{shownStart === weekStart ? 'Cette semaine' : `Semaine du ${parse(shownStart).getDate()} ${MONTHS[parse(shownStart).getMonth()]}`}</span>
+          <button className="link" aria-label="Semaine suivante" onClick={() => setPicked(addDays(sel, 7))}>›</button>
+        </div>
         <div className="week">
           {week.map(d => {
-            const state = d === t ? 'now' : doneDays.has(d) ? 'done' : planOf(d) ? 'plan' : 'rest'
-            const label = `${DAYS[weekday(d)]} : ${state === 'done' ? 'séance faite' : state === 'plan' ? 'séance prévue' : state === 'now' ? "aujourd'hui" : 'repos'}`
+            const done = doneFor(d)
+            const state = d === t ? 'now' : done ? 'done' : planOf(d) ? 'plan' : 'rest'
+            const label = `${longDate(d)} : ${state === 'done' ? 'séance faite' : state === 'plan' ? (d < t ? 'séance pas encore faite' : 'séance prévue') : state === 'now' ? "aujourd'hui" : 'repos'}`
             return (
-              <div key={d} className={'day ' + state + (d === t && doneDays.has(d) ? ' done' : '')} aria-label={label}>
+              <button key={d} className={'day ' + state + (d === t && done ? ' done' : '') + (d === sel && d !== t ? ' sel' : '')}
+                aria-label={label} aria-pressed={d === sel} onClick={() => setPicked(d)}>
                 <span>{DAYS[weekday(d)][0]}</span>
                 <i>{parse(d).getDate()}</i>
-              </div>
+              </button>
             )
           })}
         </div>
+        {sel !== t && <button className="link plan-link" onClick={() => setPicked(null)}>Revenir à aujourd'hui</button>}
       </section>
 
-      {plan ? (
+      {worked ? (
+        <section className="card">
+          <span className="eyebrow">{longDate(sel)}</span>
+          <h2>{worked.title || 'Séance faite'}</h2>
+          <span className="sub">{worked.date === sel ? 'Séance faite ce jour-là.' : `Faite le ${longDate(worked.date).toLowerCase()}.`}</span>
+          <ol className="plan-list">
+            {worked.entries.map((e, i) => (
+              <li key={i}>
+                <span>{exById(e.exerciseId)?.name ?? 'Exercice'}</span>
+                <span className="data">{entrySummary(e, exById(e.exerciseId))}</span>
+              </li>
+            ))}
+          </ol>
+          <button className="btn soft" onClick={() => openWorkoutEdit(worked.id)}>Modifier cette séance</button>
+        </section>
+      ) : plan ? (
         <section className="card today">
           <div className="today-head">
             <div>
-              <span className="eyebrow">Séance du jour</span>
+              <span className="eyebrow">{sel === t ? 'Séance du jour' : longDate(sel)}</span>
               <h2>{plan.title || 'Séance prévue'}</h2>
               <span className="sub">{plan.items.length} exercice{plan.items.length > 1 ? 's' : ''}{cyc ? ` · semaine ${cyc.week} sur ${cyc.total}` : ''}</span>
               {cyc?.deload && <span className="sub deload-note">Semaine allégée : moins de séries, charges plus légères.</span>}
@@ -134,16 +167,18 @@ export function Home() {
               ))}
             </ol>
           )}
-          {!active && <button className="btn go" onClick={() => start(plan.title || undefined)}>Commencer la séance</button>}
+          {!active && <button className="btn go" onClick={() => start(plan.title || undefined)}>{sel === t ? 'Commencer la séance' : "Faire cette séance aujourd'hui"}</button>}
+          {sel < t && <button className="btn soft" onClick={() => openWorkoutAdd(sel)}>Je l'ai faite ce jour-là</button>}
           <button className="link plan-link" onClick={openPlanning}>Modifier le planning</button>
         </section>
       ) : (
         <section className="card">
-          <span className="eyebrow">Séance du jour</span>
+          <span className="eyebrow">{sel === t ? 'Séance du jour' : longDate(sel)}</span>
           <h2>Pas de séance prévue</h2>
-          <p className="sub">Profite du repos, ou entraîne-toi librement.</p>
+          {sel === t && <p className="sub">Profite du repos, ou entraîne-toi librement.</p>}
           {!plans.some(p => p.items.length) && <button className="link plan-link" onClick={openPrograms}>Choisir un programme tout prêt</button>}
-          {!active && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
+          {!active && sel === t && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
+          {sel < t && <button className="btn soft" onClick={() => openWorkoutAdd(sel)}>Ajouter une séance à cette date</button>}
           <button className="link plan-link" onClick={openPlanning}>Préparer le planning de la semaine</button>
         </section>
       )}

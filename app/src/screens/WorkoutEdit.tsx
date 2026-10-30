@@ -5,7 +5,7 @@ import { buildEntry, lastSets } from '../data/session'
 import type { Entry, Exercise, SetLog, SetType } from '../data/types'
 import { SET_TYPES } from '../data/sets'
 import { deleteWorkout, saveWorkout } from '../data/workouts'
-import { addDays, fmtNum, longDate, today } from '../lib/dates'
+import { addDays, fmtNum, longDate, today, weekday } from '../lib/dates'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ConfirmSheet, useToast } from '../components/ui'
 import './Session.css'
@@ -33,8 +33,9 @@ const toEntries = (d: Draft): Entry[] => d.entries.map(e => ({ ...(e.group ? { g
 
 type Sheet = 'add' | 'delete' | 'leave' | null
 
-// Modifier une séance passée, ou en ajouter une après coup (id absent)
-export function WorkoutEdit({ id, onClose }: { id?: string; onClose: () => void }) {
+// Modifier une séance passée, ou en ajouter une après coup (id absent).
+// Avec une date, la séance part de ce qui était prévu ce jour-là au planning.
+export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string; onClose: () => void }) {
   const exercises = useLiveQuery(allExercises) ?? []
   const toast = useToast()
   const [initial, setInitial] = useState<Draft | null>(null)
@@ -49,11 +50,19 @@ export function WorkoutEdit({ id, onClose }: { id?: string; onClose: () => void 
       if (id && !w) { setMissing(true); return }
       const draft: Draft = w
         ? { date: w.date, title: w.title, entries: w.entries.map(e => ({ exerciseId: e.exerciseId, group: e.group, sets: e.sets.map(toRow) })) }
-        : { date: addDays(today(), -1), entries: [] }
+        : { date: date ?? addDays(today(), -1), entries: [] }
+      if (!w && date) {
+        const plan = await db.plans.get(weekday(date)), all = await allExercises()
+        draft.title = plan?.title || undefined
+        for (const it of plan?.items ?? []) {
+          const ex = all.find(e => e.id === it.exerciseId)
+          if (ex) draft.entries.push({ exerciseId: ex.id, group: it.group, sets: buildEntry(ex, await lastSets(ex.id), it).sets.map(toRow) })
+        }
+      }
       setInitial(draft)
       setD(draft)
     })()
-  }, [id])
+  }, [id, date])
 
   if (missing) {
     return (
@@ -103,7 +112,7 @@ export function WorkoutEdit({ id, onClose }: { id?: string; onClose: () => void 
   return (
     <div className="screen session">
       <header className="ses-bar">
-        <button className="link" onClick={leave}>‹ Séances</button>
+        <button className="link" onClick={leave}>‹ Retour</button>
         <button className="pill" disabled={busy || !hasData || !d.date} onClick={save}>Enregistrer</button>
       </header>
 

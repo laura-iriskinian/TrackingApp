@@ -1,7 +1,7 @@
 // Écrans en plein écran, sans barre d'onglets. On retient d'où on vient pour y revenir en fermant.
 let from = ''
 const open = (hash: string) => {
-  from = location.hash.slice(1)
+  from = location.hash.slice(1) || 'accueil'
   location.hash = hash
 }
 export const backTo = (fallback: string) => (from && from !== location.hash.slice(1) ? from : fallback)
@@ -9,6 +9,8 @@ export const backTo = (fallback: string) => (from && from !== location.hash.slic
 export const openSession = () => open('#seance')
 // Modification d'une séance passée, ou ajout d'une séance après coup (sans id)
 export const openWorkoutEdit = (id?: string) => open('#seance-passee' + (id ? '/' + id : ''))
+// Séance oubliée : ajoutée à une date choisie, pré-remplie avec le planning de ce jour
+export const openWorkoutAdd = (date: string) => open('#seance-passee/date/' + date)
 export const openPlanning = () => open('#planning')
 export const openTimer = () => open('#chrono')
 export const openExercises = () => open('#exercices')

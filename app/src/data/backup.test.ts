@@ -7,14 +7,14 @@ import { checkBackup, restoreBackup } from './backup'
 beforeEach(async () => { await eraseAll() })
 
 const fill = async () => {
-  await db.workouts.add({ id: 'w1', date: '2026-10-01', exerciseIds: ['squat'], updatedAt: 1, entries: [{ exerciseId: 'squat', group: 'g1', sets: [{ weight: 60, reps: 8, type: 'warmup', feel: 'easy', done: true }] }] })
+  await db.workouts.add({ id: 'w1', date: '2026-10-01', forDate: '2026-09-30', exerciseIds: ['squat'], updatedAt: 1, entries: [{ exerciseId: 'squat', group: 'g1', sets: [{ weight: 60, reps: 8, type: 'warmup', feel: 'easy', done: true }] }] })
   await db.measures.add({ id: 'm1', date: '2026-10-01', values: { weight: 61 }, updatedAt: 1 })
   await db.measureKinds.add({ id: 'perso-mollet', name: 'Mollet', unit: 'cm' })
   await db.plans.add({ weekday: 2, title: 'Haut', items: [{ exerciseId: 'tractions', sets: 2, types: ['warmup', null] }], updatedAt: 1 })
   await db.goals.add({ id: 'g', metric: 'max-weight:squat', target: 80, by: '2026-12-01', start: 60, direction: 'up', updatedAt: 1 })
   await db.exercises.add({ id: 'perso-x', name: 'X', kind: 'strength', group: 'Mes exercices', primary: ['quads'], secondary: [], custom: true })
   await db.notes.add({ exerciseId: 'squat', text: 'pieds écartés', updatedAt: 1 })
-  await saveProfile({ name: 'Laura', effortMode: 'rpe' })
+  await saveProfile({ name: 'Laura', effortMode: 'rpe', restExSec: 180 })
 }
 
 describe('sauvegarde NextRep', () => {

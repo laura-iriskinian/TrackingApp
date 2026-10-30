@@ -61,7 +61,10 @@ export default function App() {
   if (tab === 'exercices') return full(<Exercises onClose={() => go(backTo('seances') as TabId)} />)
   if (tab === 'programmes') return full(<Programs onClose={() => go(backTo('seances') as TabId)} />)
   if (tab === 'chrono') return full(<Timer onClose={() => go(backTo('seances') as TabId)} />)
-  if (tab.startsWith('seance-passee')) return full(<WorkoutEdit key={tab} id={tab.split('/')[1]} onClose={() => go('seances')} />)
+  if (tab.startsWith('seance-passee')) {
+    const [, a, b] = tab.split('/')
+    return full(<WorkoutEdit key={tab} id={a === 'date' ? undefined : a} date={a === 'date' ? b : undefined} onClose={() => go(backTo('seances') as TabId)} />)
+  }
 
   const { Screen } = TABS.find(t => t.id === tab)!
   return (

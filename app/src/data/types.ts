@@ -53,6 +53,7 @@ export interface Workout {
   exerciseIds: string[] // index pour retrouver vite l'historique d'un exercice
   note?: string
   deload?: boolean // faite pendant une semaine allégée : ignorée pour proposer la charge suivante
+  forDate?: string // jour du planning dont vient la séance, si elle a été faite un autre jour
   updatedAt: number
 }
 
@@ -147,6 +148,7 @@ export interface Profile {
   sex?: 'f' | 'h'
   weekStart: number
   restSec: number // repos par défaut entre deux séries
+  restExSec?: number // repos entre deux exercices. Absent : le même qu'entre deux séries
   effortMode: 'off' | 'simple' | 'rpe' | 'rir'
   barKg: number // poids de la barre, pour le calcul des disques
   plates: number[] // disques disponibles

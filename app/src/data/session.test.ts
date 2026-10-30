@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { allExercises, db, eraseAll } from './db'
-import { buildEntry, completeSet, finishSession, getSession, isFinished, nextInRound, startSession } from './session'
+import { buildEntry, completeSet, finishSession, getSession, isFinished, nextInRound, restAfter, startSession } from './session'
 import { CATALOG } from './exercises'
 import { today } from '../lib/dates'
 
@@ -95,5 +95,35 @@ describe('séance guidée', () => {
     s = completeSet(s, 0, 1, { weight: 50, reps: 10 })
     s = completeSet(s, 1, 1, { weight: 20, reps: 10 })
     expect(s.cur).toBe(2) // superset fini : exercice suivant
+  })
+
+  it('applique le repos entre exercices seulement quand on change d’exercice', () => {
+    let s = { id: 's', date: today(), startedAt: 0, cur: 0, entries: [buildEntry(squat, [], { sets: 2 }), buildEntry(course, [])] }
+    s = completeSet(s, 0, 0, { weight: 50, reps: 10 })
+    expect(restAfter(s, 0, 90, 180)).toEqual({ sec: 90, between: false })
+    s = completeSet(s, 0, 1, { weight: 50, reps: 10 })
+    expect(restAfter(s, 0, 90, 180)).toEqual({ sec: 180, between: true })
+    s = completeSet(s, 1, 0, { km: 5, min: 30 })
+    expect(restAfter(s, 1, 90, 180).sec).toBe(0) // séance finie
+  })
+
+  it('compte la fin d’un superset comme un changement d’exercice', () => {
+    const a = { ...buildEntry(squat, [], { sets: 2 }), group: 'g' }
+    const b = { ...buildEntry(squat, [], { sets: 2 }), exerciseId: 'fentes', group: 'g' }
+    let s = { id: 's', date: today(), startedAt: 0, cur: 0, entries: [a, b, buildEntry(course, [])] }
+    s = completeSet(s, 0, 0, { weight: 50, reps: 10 })
+    expect(restAfter(s, 0, 90, 180).sec).toBe(0) // dans le tour
+    s = completeSet(s, 1, 0, { weight: 20, reps: 10 })
+    expect(restAfter(s, 1, 90, 180)).toEqual({ sec: 90, between: false }) // fin du tour, même superset
+    s = completeSet(s, 0, 1, { weight: 50, reps: 10 })
+    s = completeSet(s, 1, 1, { weight: 20, reps: 10 })
+    expect(restAfter(s, 1, 90, 180)).toEqual({ sec: 180, between: true })
+  })
+
+  it('retient le jour du planning d’une séance décalée', async () => {
+    let s = await startSession('Jambes', [{ exerciseId: 'squat' }], await allExercises(), '2026-10-26')
+    s = completeSet(s, 0, 0, { weight: 40, reps: 10 })
+    const w = await finishSession(s)
+    expect((await db.workouts.get(w!.id))?.forDate).toBe('2026-10-26')
   })
 })

@@ -4,6 +4,7 @@ import { APP_NAME, THEME_KEY } from '../config'
 import { db, eraseAll, exportAll, getProfile, saveProfile } from '../data/db'
 import { importLegacy, legacySummary } from '../data/legacy'
 import { longDate, nb, today } from '../lib/dates'
+import { REST_CHOICES, restLabel } from '../data/session'
 import { checkBackup, MAX_BACKUP_BYTES, restoreBackup, type CheckedBackup } from '../data/backup'
 import { applyTheme, type Theme } from '../lib/theme'
 import { ConfirmSheet, useToast } from '../components/ui'
@@ -105,6 +106,22 @@ export function Profile() {
           <div className="seg" role="group" aria-labelledby="wt-l">
             {[1, 2, 3, 4, 5, 6].map(n => (
               <button key={n} aria-pressed={(profile?.weeklyTarget ?? 3) === n} onClick={() => saveProfile({ weeklyTarget: n })}>{n}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span className="sub" id="rs-l">Repos entre deux séries</span>
+          <div className="seg tight" role="group" aria-labelledby="rs-l">
+            {REST_CHOICES.map(v => (
+              <button key={v} aria-pressed={(profile?.restSec ?? 90) === v} onClick={() => saveProfile({ restSec: v })}>{restLabel(v)}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <span className="sub" id="rx-l">Repos entre deux exercices</span>
+          <div className="seg tight" role="group" aria-labelledby="rx-l">
+            {REST_CHOICES.map(v => (
+              <button key={v} aria-pressed={(profile?.restExSec ?? profile?.restSec ?? 90) === v} onClick={() => saveProfile({ restExSec: v })}>{restLabel(v)}</button>
             ))}
           </div>
         </div>

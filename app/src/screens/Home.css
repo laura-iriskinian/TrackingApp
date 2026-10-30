@@ -1,5 +1,7 @@
 .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.day { display: grid; gap: 6px; justify-items: center; }
+.week-nav { display: flex; justify-content: space-between; align-items: center; }
+.week-nav .link { font-size: 1.3rem; line-height: 1; padding: 6px 14px; }
+.day { display: grid; gap: 6px; justify-items: center; border: 0; background: none; padding: 4px 0; }
 .day span { font: 500 .68rem var(--f-data); color: var(--mute); }
 .day i {
   width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
@@ -9,6 +11,7 @@
 .day.done i { background: var(--ink); color: var(--paper); }
 .day.now i { background: var(--effort); color: var(--on-effort); }
 .day.rest i { background: transparent; color: var(--mute); }
+.day.sel i { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 .today-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
 .today-head h2 { font-size: 1.5rem; margin: 4px 0 2px; }

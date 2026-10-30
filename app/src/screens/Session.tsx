@@ -2,8 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState } from 'react'
 import { allExercises, db, getProfile, saveProfile } from '../data/db'
 import {
-  buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, groupOf, isFinished, lastSets, nextInRound,
-  nextSetIndex, saveSession, type ActiveSession,
+  buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, groupOf, lastSets,
+  nextSetIndex, REST_CHOICES, restAfter, restLabel, saveSession, type ActiveSession,
 } from '../data/session'
 import { effortLabel, FEELS, isWork, newGroupId, SET_TYPES, typeShort } from '../data/sets'
 import { MUSCLE_LABEL } from '../data/exercises'
@@ -85,15 +85,15 @@ export function Session({ onClose }: { onClose: () => void }) {
   const entry = s.entries[s.cur] as Entry | undefined
   const ex = entry && exById(entry.exerciseId)
   const restSec = profile?.restSec ?? 90
+  const restExSec = profile?.restExSec ?? restSec
   const resting = s.restEndsAt && now < s.restEndsAt
 
   const validate = (ei: number, si: number, values: Omit<SetLog, 'done'>) => {
     unlockAudio()
     celebrate(s, ei, values)
     const next = completeSet(s, ei, si, values)
-    // Superset : pas de repos entre les exercices d'un même tour
-    const rest = !isFinished(next) && restSec > 0 && nextInRound(next.entries, ei) == null
-    saveSession({ ...next, restEndsAt: rest ? Date.now() + restSec * 1000 : undefined, restTotal: rest ? restSec : undefined })
+    const { sec, between } = restAfter(next, ei, restSec, restExSec)
+    saveSession({ ...next, restEndsAt: sec ? Date.now() + sec * 1000 : undefined, restTotal: sec || undefined, restEx: between || undefined })
   }
 
   const patchEntry = (ei: number, fn: (e: Entry) => Entry | null) => {
@@ -207,7 +207,7 @@ export function Session({ onClose }: { onClose: () => void }) {
       {resting && (
         <Rest endsAt={s.restEndsAt!} total={s.restTotal ?? restSec} now={now} next={nextLabel(s, exById)}
           onChange={endsAt => saveSession(endsAt > Date.now() ? { ...s, restEndsAt: endsAt } : { ...s, restEndsAt: undefined, restTotal: undefined })}
-          restSec={restSec} onDefault={sec => saveProfile({ restSec: sec })} />
+          between={!!s.restEx} value={s.restEx ? restExSec : restSec} onDefault={sec => saveProfile(s.restEx ? { restExSec: sec } : { restSec: sec })} />
       )}
 
       {sheet === 'add' && (
@@ -462,16 +462,16 @@ function ExerciseNoteField({ exerciseId }: { exerciseId: string }) {
 }
 
 // Repos : compte à rebours en plein écran, réglable sans quitter la séance
-function Rest({ endsAt, total, now, next, onChange, restSec, onDefault }: {
+function Rest({ endsAt, total, now, next, onChange, between, value, onDefault }: {
   endsAt: number; total: number; now: number; next: string
-  onChange: (endsAt: number) => void; restSec: number; onDefault: (sec: number) => void
+  onChange: (endsAt: number) => void; between: boolean; value: number; onDefault: (sec: number) => void
 }) {
   const left = Math.max(0, (endsAt - now) / 1000)
   const R = 88, C = 2 * Math.PI * R
   const frac = total ? Math.min(1, left / total) : 0
   return (
     <div className="rest-screen" role="dialog" aria-modal="true" aria-label="Repos">
-      <span className="eyebrow">Repos</span>
+      <span className="eyebrow">{between ? 'Repos entre deux exercices' : 'Repos'}</span>
       <div className="ring">
         <svg viewBox="0 0 200 200" aria-hidden="true">
           <circle cx="100" cy="100" r={R} className="ring-bg" />
@@ -486,10 +486,10 @@ function Rest({ endsAt, total, now, next, onChange, restSec, onDefault }: {
       </div>
       <button className="btn" onClick={() => onChange(0)}>Passer le repos</button>
       <div className="rest-default">
-        <span className="sub" id="rd-l">Repos par défaut</span>
-        <div className="seg" role="group" aria-labelledby="rd-l">
-          {[60, 90, 120, 180].map(v => (
-            <button key={v} aria-pressed={restSec === v} onClick={() => onDefault(v)}>{v < 120 ? v + ' s' : v / 60 + ' min'}</button>
+        <span className="sub" id="rd-l">{between ? 'Par défaut entre deux exercices' : 'Par défaut entre deux séries'}</span>
+        <div className="seg tight" role="group" aria-labelledby="rd-l">
+          {REST_CHOICES.map(v => (
+            <button key={v} aria-pressed={value === v} onClick={() => onDefault(v)}>{restLabel(v)}</button>
           ))}
         </div>
       </div>

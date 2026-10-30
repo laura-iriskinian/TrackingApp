@@ -83,6 +83,7 @@ button { cursor: pointer; }
 .seg { display: flex; background: var(--paper); border-radius: 99px; padding: 4px; }
 .seg button { flex: 1; border: 0; background: transparent; border-radius: 99px; padding: 9px; font-weight: 600; font-size: .9rem; color: var(--mute); }
 .seg button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+.seg.tight button { padding: 9px 2px; white-space: nowrap; font-size: .85rem; }
 
 .list { display: grid; }
 .list > * + * { border-top: 1px solid var(--line); }

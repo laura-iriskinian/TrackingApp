@@ -14,11 +14,17 @@ export interface ActiveSession {
   cur: number // exercice affiché
   restEndsAt?: number
   restTotal?: number // durée du repos en cours, en secondes
+  restEx?: boolean // le repos en cours sépare deux exercices
   deload?: boolean // semaine allégée du cycle
+  forDate?: string // jour du planning dont vient la séance, si ce n'est pas aujourd'hui
 }
 
 const KEY = 'session'
 const DEFAULT_SETS = 3
+
+// Durées proposées pour le repos, en secondes
+export const REST_CHOICES = [60, 90, 120, 180, 300]
+export const restLabel = (sec: number) => (sec < 120 ? sec + ' s' : sec / 60 + ' min')
 
 export async function getSession(): Promise<ActiveSession | undefined> {
   return (await db.kv.get(KEY))?.value as ActiveSession | undefined
@@ -59,7 +65,7 @@ export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, '
   return e
 }
 
-export async function startSession(title: string | undefined, items: PlanItem[], exercises: Exercise[]) {
+export async function startSession(title: string | undefined, items: PlanItem[], exercises: Exercise[], forDate?: string) {
   const deload = !!cycleWeek((await getProfile()).cycle, today())?.deload
   const entries: Entry[] = []
   for (const it of items) {
@@ -71,6 +77,7 @@ export async function startSession(title: string | undefined, items: PlanItem[],
   }
   const s: ActiveSession = { id: newId(), date: today(), title, startedAt: Date.now(), entries, cur: 0 }
   if (deload) s.deload = true
+  if (forDate) s.forDate = forDate
   await saveSession(s)
   return s
 }
@@ -115,6 +122,14 @@ export function completeSet(s: ActiveSession, ei: number, si: number, values: Om
   return { ...s, entries, cur }
 }
 
+// Repos après une série, une fois validée : aucun dans un tour de superset ni en fin de séance,
+// sinon la durée entre deux séries, ou entre deux exercices si on change d'exercice (ou de superset).
+export function restAfter(next: ActiveSession, ei: number, restSec: number, restExSec: number) {
+  if (isFinished(next) || nextInRound(next.entries, ei) != null) return { sec: 0, between: false }
+  const between = !groupOf(next.entries, ei).includes(next.cur)
+  return { sec: between ? restExSec : restSec, between }
+}
+
 const sameValues = (a: SetLog, b: SetLog) => a.weight === b.weight && a.reps === b.reps && a.km === b.km && a.min === b.min && a.type === b.type
 
 export const isFinished = (s: ActiveSession) => s.entries.length > 0 && s.entries.every(e => nextSetIndex(e) < 0)
@@ -135,12 +150,14 @@ export async function finishSession(s: ActiveSession): Promise<Workout | null> {
     updatedAt: Date.now(),
   }
   if (s.deload) w.deload = true
+  if (s.forDate) w.forDate = s.forDate
   await db.transaction('rw', db.workouts, db.kv, async () => {
     // Le même jour, l'ancienne app regroupait tout dans une séance : on fait pareil pour ne pas dédoubler l'historique
     const same = await db.workouts.where('date').equals(s.date).first()
     if (same) {
       const merged = [...same.entries, ...entries]
-      await db.workouts.put({ ...same, entries: merged, exerciseIds: [...new Set(merged.map(e => e.exerciseId))], updatedAt: Date.now() })
+      const forDate = same.forDate ?? s.forDate
+      await db.workouts.put({ ...same, ...(forDate ? { forDate } : {}), entries: merged, exerciseIds: [...new Set(merged.map(e => e.exerciseId))], updatedAt: Date.now() })
       w.id = same.id
     } else {
       await db.workouts.add(w)
