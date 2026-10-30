@@ -107,6 +107,21 @@ describe('séance guidée', () => {
     expect(restAfter(s, 1, 90, 180).sec).toBe(0) // séance finie
   })
 
+  it('garde les paliers d’une dégressive et les reprend à la séance suivante', async () => {
+    const parts = [{ weight: 45, reps: 6 }, { weight: 30, reps: 5 }]
+    let s = await startSession(undefined, [{ exerciseId: 'squat', sets: 1, types: ['drop'] }], await allExercises())
+    s = completeSet(s, 0, 0, { weight: 60, reps: 8, type: 'drop', parts })
+    await finishSession(s)
+    const next = await startSession(undefined, [{ exerciseId: 'squat', sets: 1, types: ['drop'] }], await allExercises())
+    expect(next.entries[0].sets[0]).toMatchObject({ weight: 60, reps: 8, type: 'drop', parts, done: false })
+  })
+
+  it('laisse sa propre charge à chaque série d’une pyramide', () => {
+    const s = { id: 's', date: today(), startedAt: 0, cur: 0, entries: [buildEntry(squat, [{ weight: 60, reps: 12, done: true }], { sets: 3 })] }
+    const n = completeSet(s, 0, 0, { weight: 70, reps: 10, type: 'pyramid' })
+    expect(n.entries[0].sets.map(x => [x.weight, x.type])).toEqual([[70, 'pyramid'], [60, 'pyramid'], [60, 'pyramid']])
+  })
+
   it('compte la fin d’un superset comme un changement d’exercice', () => {
     const a = { ...buildEntry(squat, [], { sets: 2 }), group: 'g' }
     const b = { ...buildEntry(squat, [], { sets: 2 }), exerciseId: 'fentes', group: 'g' }

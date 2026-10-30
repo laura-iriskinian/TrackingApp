@@ -3,7 +3,7 @@
 import { db, DATA_TABLES, mergeIntoCatalog } from './db'
 import { migrateEntries, migrateItems, SET_TYPES } from './sets'
 import type {
-  Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetType, Template, Workout,
+  Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Muscle, Plan, PlanItem, Profile, SetLog, SetPart, SetType, Template, Workout,
 } from './types'
 import { MUSCLE_LABEL } from './exercises'
 import { convertLegacy, isLegacyExport } from './legacy'
@@ -26,11 +26,18 @@ const pick = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o)
 const SET_TYPE_IDS = SET_TYPES.flatMap(t => (t.id ? [t.id] : []))
 const MUSCLES = Object.keys(MUSCLE_LABEL) as Muscle[]
 
+function setPart(v: unknown): SetPart | undefined {
+  if (!isObj(v) || (v.weight != null && num(v.weight, 0, 2000) == null) || num(v.reps, 0, 1000) == null) return
+  return pick({ weight: num(v.weight, 0, 2000), reps: num(v.reps, 0, 1000) })
+}
+
 function setLog(v: unknown): SetLog | undefined {
   if (!isObj(v)) return
+  const parts = list(v.parts, 20)?.map(setPart)
+  if (v.parts != null && (!parts || parts.some(p => !p))) return
   const out = pick({
     weight: num(v.weight, 0, 2000), reps: num(v.reps, 0, 1000), km: num(v.km, 0, 1000), min: num(v.min, 0, 10000),
-    type: oneOf(v.type, SET_TYPE_IDS), feel: oneOf(v.feel, ['easy', 'hard', 'max'] as const),
+    type: oneOf(v.type, SET_TYPE_IDS), parts: parts?.length ? parts as SetPart[] : undefined, feel: oneOf(v.feel, ['easy', 'hard', 'max'] as const),
     rpe: num(v.rpe, 1, 10), rir: num(v.rir, 0, 20), done: v.done !== false,
   })
   // Une valeur présente mais invalide (texte, négative…) : la série entière est écartée

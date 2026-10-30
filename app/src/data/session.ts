@@ -57,6 +57,7 @@ export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, '
       ? { km: p?.km, min: p?.min, done: false }
       : { weight: p?.weight, reps: p?.reps ?? (goal > 0 ? goal : undefined), done: false }
     if (type) s.type = type
+    if (p?.parts && p.type === type) s.parts = p.parts // mêmes paliers que la dernière fois
     return s
   })
   const e: Entry = { exerciseId: ex.id, sets }
@@ -103,7 +104,11 @@ export function completeSet(s: ActiveSession, ei: number, si: number, values: Om
     const before = e.sets[si]
     const sets = e.sets.map((x, j) => {
       if (j === si) return { ...x, ...values, done: true }
-      if (j > si && !x.done && sameValues(x, before)) return { ...x, weight: values.weight, reps: values.reps, km: values.km, min: values.min }
+      if (j > si && !x.done && sameValues(x, before)) {
+        // Pyramide : la série suivante en fait partie, mais avec sa propre charge
+        if (values.type === 'pyramid') return { ...x, type: values.type }
+        return { ...x, weight: values.weight, reps: values.reps, km: values.km, min: values.min, ...(x.type === values.type && values.parts ? { parts: values.parts } : {}) }
+      }
       return x
     })
     return { ...e, sets }

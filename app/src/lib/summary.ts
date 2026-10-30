@@ -1,6 +1,7 @@
 import type { Entry, Exercise, Muscle, PlanItem, SetLog } from '../data/types'
 import { fmtNum } from './dates'
 import { isWork, typeShort, typesSummary } from '../data/sets'
+import { isTimed } from '../data/exercises'
 
 const pace = (min: number, km: number) => {
   let m = Math.floor(min / km), s = Math.round((min / km - m) * 60)
@@ -8,8 +9,17 @@ const pace = (min: number, km: number) => {
   return `${m}:${String(s).padStart(2, '0')} /km`
 }
 
+const repsText = (r: number | undefined, timed: boolean) => (r == null ? '?' : timed ? r + ' s' : String(r))
+
+// Une série : « 60 kg × 8 », « 60 kg × 8 → 45 kg × 6 » en dégressive, « 60 kg × 8 + 4 + 3 » en rest-pause
+export function setLine(s: SetLog, timed = false): string {
+  const main = `${s.weight != null ? fmtNum(s.weight) + ' kg' : 'poids du corps'} × ${repsText(s.reps, timed)}`
+  return main + (s.parts ?? []).map(p => (p.weight != null ? ` → ${fmtNum(p.weight)} kg × ${repsText(p.reps, timed)}` : ` + ${repsText(p.reps, timed)}`)).join('')
+}
+
 // Résumé lisible d'un exercice : « 3 × 8 · 60 kg », ou « 5 km · 28 min · 5:36 /km ».
 // Le type des séries non normales est précisé : « 1 × 12 · 20 kg échauffement / 3 × 8 · 60 kg ».
+// Les séries à plusieurs étapes sont détaillées : « 2 × (60 kg × 8 → 45 kg × 6) dégressive ».
 export function entrySummary(e: Entry, ex?: Exercise): string {
   if (ex?.kind === 'cardio') {
     return e.sets.map((s: SetLog) => [
@@ -18,16 +28,24 @@ export function entrySummary(e: Entry, ex?: Exercise): string {
       s.km && s.min ? pace(s.min, s.km) : '',
     ].filter(Boolean).join(' · ')).join(' / ')
   }
-  const groups: { w?: number; r?: number; t: string; n: number }[] = []
+  const timed = isTimed(ex)
+  const groups: { s: SetLog; key: string; t: string; n: number }[] = []
   for (const s of e.sets) {
-    const last = groups[groups.length - 1], t = typeShort(s.type)
-    if (last && last.w === s.weight && last.r === s.reps && last.t === t) last.n++
-    else groups.push({ w: s.weight, r: s.reps, t, n: 1 })
+    const last = groups[groups.length - 1], t = typeShort(s.type), key = JSON.stringify([s.weight, s.reps, s.parts])
+    if (last && last.key === key && last.t === t) last.n++
+    else groups.push({ s, key, t, n: 1 })
   }
-  return groups.map(g => `${g.n} × ${g.r ?? '?'}${g.w != null ? ' · ' + fmtNum(g.w) + ' kg' : ''}${g.t ? ' ' + g.t : ''}`).join(' / ')
+  return groups.map(({ s, t, n }) => {
+    const text = s.parts?.length
+      ? (n > 1 ? `${n} × (${setLine(s, timed)})` : setLine(s, timed))
+      : `${n} × ${repsText(s.reps, timed)}${s.weight != null ? ' · ' + fmtNum(s.weight) + ' kg' : ''}`
+    return text + (t ? ' ' + t : '')
+  }).join(' / ')
 }
 
-export const volume = (sets: SetLog[]) => sets.filter(isWork).reduce((a, s) => a + (s.weight ?? 0) * (s.reps ?? 0), 0)
+// Chaque palier ou reprise compte, à sa charge ou à celle de la série
+export const volume = (sets: SetLog[]) => sets.filter(isWork).reduce((a, s) =>
+  a + (s.weight ?? 0) * (s.reps ?? 0) + (s.parts ?? []).reduce((b, p) => b + (p.weight ?? s.weight ?? 0) * (p.reps ?? 0), 0), 0)
 
 // Muscles travaillés par un ensemble d'exercices : un muscle principal quelque part n'est plus secondaire
 export function musclesOf(list: (Exercise | undefined)[]) {

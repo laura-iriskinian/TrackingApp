@@ -5,17 +5,18 @@ import {
   buildEntry, completeSet, doneCount, dropSession, finishSession, getSession, groupOf, lastSets,
   nextSetIndex, REST_CHOICES, restAfter, restLabel, saveSession, type ActiveSession,
 } from '../data/session'
-import { effortLabel, FEELS, isWork, newGroupId, SET_TYPES, typeShort } from '../data/sets'
-import { MUSCLE_LABEL } from '../data/exercises'
+import { effortLabel, FEELS, hasParts, isWork, newGroupId, SET_TYPES, typeShort } from '../data/sets'
+import { isTimed, MUSCLE_LABEL } from '../data/exercises'
 import { alternatives, suggestNext, warmupSets } from '../lib/coach'
 import { PlatesSheet } from '../components/Plates'
 import type { Entry, Exercise, Profile, SetLog, SetType, Workout } from '../data/types'
 import { fmtNum, fmtThousands } from '../lib/dates'
 import { keepAwake, restOver, unlockAudio } from '../lib/signal'
-import { entrySummary, fmtTarget, musclesOf, volume } from '../lib/summary'
+import { entrySummary, fmtTarget, musclesOf, setLine, volume } from '../lib/summary'
 import { e1rm, recordBeaten, setsOf } from '../lib/records'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseSheet } from '../components/ExerciseSheet'
+import { partRows, rowsToParts, SetParts, type PartRow } from '../components/SetParts'
 import { MuscleMap } from '../components/MuscleMap'
 import { ConfirmSheet, useToast } from '../components/ui'
 import './Session.css'
@@ -242,7 +243,7 @@ function nextLabel(s: ActiveSession, exById: (id: string) => Exercise | undefine
   const x = e.sets[i], ex = exById(e.exerciseId)
   const val = ex?.kind === 'cardio'
     ? [x.km != null && fmtNum(x.km) + ' km', x.min != null && fmtNum(x.min) + ' min'].filter(Boolean).join(' · ')
-    : [x.weight != null && fmtNum(x.weight) + ' kg', x.reps != null && x.reps + ' rép.'].filter(Boolean).join(' × ')
+    : [x.weight != null && fmtNum(x.weight) + ' kg', x.reps != null && x.reps + (isTimed(ex) ? ' s' : ' rép.')].filter(Boolean).join(' × ')
   return `${ex?.name ?? 'Exercice'} · série ${i + 1}${val ? ' · ' + val : ''}`
 }
 
@@ -258,15 +259,24 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
   const si = nextSetIndex(entry)
   const set = entry.sets[si] as SetLog | undefined
   const last = useLiveQuery(() => lastSets(ex.id), [ex.id])
-  const fields = cardio
-    ? [{ k: 'km', label: 'Distance', unit: 'km', step: .5 }, { k: 'min', label: 'Durée', unit: 'min', step: 1 }] as const
-    : [{ k: 'weight', label: 'Charge', unit: 'kg', step: 2.5 }, { k: 'reps', label: 'Répétitions', unit: 'rép.', step: 1 }] as const
-  const [vals, setVals] = useState<Record<string, string>>({})
   const [type, setType] = useState<SetType | undefined>()
+  const timed = isTimed(ex)
+  // La saisie suit l'exercice (charge, lest, durée tenue, distance) et le type de la série
+  const fields: { k: 'km' | 'min' | 'weight' | 'reps'; label: string; unit: string; step: number }[] = cardio
+    ? [{ k: 'km', label: 'Distance', unit: 'km', step: .5 }, { k: 'min', label: 'Durée', unit: 'min', step: 1 }]
+    : [
+        { k: 'weight', label: type === 'drop' ? 'Charge du palier 1' : ex.equipment === 'bodyweight' ? 'Lest' : 'Charge', unit: 'kg', step: 2.5 },
+        timed
+          ? { k: 'reps', label: 'Durée tenue', unit: 's', step: 5 }
+          : { k: 'reps', label: type === 'failure' ? 'Répétitions réussies' : type === 'restpause' ? 'Reprise 1' : 'Répétitions', unit: 'rép.', step: 1 },
+      ]
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [parts, setParts] = useState<PartRow[]>([])
   const [effort, setEffort] = useState<Pick<SetLog, 'feel' | 'rpe' | 'rir'>>({})
   useEffect(() => {
     setVals(Object.fromEntries(fields.map(f => [f.k, set?.[f.k] != null ? fmtNum(set[f.k]!) : ''])))
     setType(set?.type)
+    setParts(partRows(set?.type, set?.parts, { weight: set?.weight, reps: set?.reps }))
     setEffort({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [si, entry.sets.length])
@@ -277,6 +287,12 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
   })
   const values = Object.fromEntries(fields.map(f => [f.k, toNum(vals[f.k] ?? '')]))
   const canValidate = cardio ? values.km != null || values.min != null : values.reps != null
+  const pickType = (t: SetType | undefined) => {
+    if (t === type) return
+    setType(t)
+    setParts(partRows(t, t === set?.type ? set?.parts : undefined, { weight: values.weight, reps: values.reps }))
+  }
+  const cleanParts = rowsToParts(parts)
   const { primary, secondary } = musclesOf([ex])
   const hasMap = primary.length + secondary.length > 0
   // Progression proposée au début de l'exercice, tant que rien n'a été validé et que la charge n'a pas été changée
@@ -318,7 +334,7 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
               <span className="data">{i + 1}</span>
               <span>{cardio
                 ? [x.km != null && fmtNum(x.km) + ' km', x.min != null && fmtNum(x.min) + ' min'].filter(Boolean).join(' · ') || '—'
-                : `${x.weight != null ? fmtNum(x.weight) + ' kg' : 'poids du corps'} × ${x.reps ?? '?'}`}
+                : setLine(x, timed)}
                 {tag && <span className="set-tag">{tag}</span>}</span>
               {x.done
                 ? <button className="tick" aria-label={`Série ${i + 1} faite, toucher pour la corriger`}
@@ -331,11 +347,14 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
 
       {set ? (
         <div className="entry-form">
-          <div className="chips" role="group" aria-label="Type de série">
-            {SET_TYPES.map(t => (
-              <button key={t.label} aria-pressed={type === t.id} onClick={() => setType(t.id)}>{t.label}</button>
-            ))}
-          </div>
+          {!cardio && (
+            <div className="chips wrap" role="group" aria-label="Type de série">
+              {SET_TYPES.map(t => (
+                <button key={t.label} aria-pressed={type === t.id} onClick={() => pickType(t.id)}>{t.label}</button>
+              ))}
+            </div>
+          )}
+          {!cardio && type && <p className="sub type-hint">{SET_TYPES.find(t => t.id === type)?.hint}</p>}
           {showSug && (
             <button className="suggest" onClick={() => {
               // Appliquée à toutes les séries de travail prévues avec les mêmes valeurs
@@ -343,7 +362,7 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
               onPatch(e => ({ ...e, sets: e.sets.map(x => (!x.done && isWork(x) && x.weight === from.weight && x.reps === from.reps ? { ...x, weight: sug.weight ?? x.weight, reps: sug.reps } : x)) }))
               setVals(v => ({ ...v, weight: sug.weight != null ? fmtNum(sug.weight) : v.weight, reps: String(sug.reps) }))
             }}>
-              <b>Essaie {sug.weight != null ? fmtNum(sug.weight) + ' kg × ' + sug.reps : sug.reps + ' répétitions'}</b>
+              <b>Essaie {sug.weight != null ? fmtNum(sug.weight) + ' kg × ' + sug.reps : sug.reps + (timed ? ' s' : ' répétitions')}{sug.weight != null && timed ? ' s' : ''}</b>
               <span>Tout réussi la dernière fois, sans aller à la limite. Touche pour l'appliquer.</span>
             </button>
           )}
@@ -361,8 +380,9 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
               </div>
             ))}
           </div>
+          {hasParts(type) && <SetParts type={type} rows={parts} start={{ weight: values.weight, reps: values.reps }} onChange={setParts} />}
           {effortMode !== 'off' && <EffortPicker mode={effortMode} value={effort} onChange={setEffort} />}
-          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(ei, si, { ...values, type, ...effort })}>
+          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(ei, si, { ...values, type, parts: cleanParts.length ? cleanParts : undefined, ...effort })}>
             Valider la série {si + 1}
           </button>
         </div>

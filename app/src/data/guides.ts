@@ -6,7 +6,7 @@ export interface Guide {
   tip?: string
 }
 
-const TIMED = 'Note la durée tenue, en secondes, à la place des répétitions.'
+const TIMED = 'Note la durée tenue, en secondes.'
 
 export const GUIDES: Record<string, Guide> = {
   // Pectoraux

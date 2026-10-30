@@ -3,16 +3,18 @@ import { useEffect, useState } from 'react'
 import { allExercises, db } from '../data/db'
 import { buildEntry, lastSets } from '../data/session'
 import type { Entry, Exercise, SetLog, SetType } from '../data/types'
-import { SET_TYPES } from '../data/sets'
+import { hasParts, SET_TYPES } from '../data/sets'
+import { isTimed } from '../data/exercises'
 import { deleteWorkout, saveWorkout } from '../data/workouts'
 import { addDays, fmtNum, longDate, today, weekday } from '../lib/dates'
 import { ExercisePicker } from '../components/ExercisePicker'
+import { partRows, rowsToParts, SetParts, type PartRow } from '../components/SetParts'
 import { ConfirmSheet, useToast } from '../components/ui'
 import './Session.css'
 
 // Les champs sont gardés en texte pendant la saisie, pour accepter « 62, » le temps de taper « 62,5 »
 type Field = 'weight' | 'reps' | 'km' | 'min'
-type Row = Partial<Record<Field, string>> & { set: SetLog } // set : la série d'origine, pour garder type et ressenti
+type Row = Partial<Record<Field, string>> & { set: SetLog; parts?: PartRow[] } // set : la série d'origine, pour garder type et ressenti
 interface DraftEntry { exerciseId: string; group?: string; sets: Row[] }
 interface Draft { date: string; title?: string; entries: DraftEntry[] }
 
@@ -23,10 +25,14 @@ const toNum = (v?: string) => {
   const n = parseFloat((v ?? '').replace(',', '.'))
   return Number.isFinite(n) && n >= 0 ? n : undefined
 }
-const toRow = (s: SetLog): Row => ({ set: s, ...Object.fromEntries(FIELDS.filter(k => s[k] != null).map(k => [k, fmtNum(s[k]!)])) })
-const toSet = ({ set, ...r }: Row): SetLog => {
+const toRow = (s: SetLog): Row => ({
+  set: s, parts: partRows(s.type, s.parts, s), ...Object.fromEntries(FIELDS.filter(k => s[k] != null).map(k => [k, fmtNum(s[k]!)])),
+})
+const toSet = ({ set, parts, ...r }: Row): SetLog => {
   const out: SetLog = { ...set, done: true }
   for (const k of FIELDS) { const n = toNum(r[k]); if (n != null) out[k] = n; else delete out[k] }
+  const steps = rowsToParts(parts ?? [])
+  if (steps.length) out.parts = steps; else delete out.parts
   return out
 }
 const toEntries = (d: Draft): Entry[] => d.entries.map(e => ({ ...(e.group ? { group: e.group } : {}), exerciseId: e.exerciseId, sets: e.sets.map(toSet) }))
@@ -86,7 +92,13 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
   const patchSet = (ei: number, si: number, k: Field, v: string) =>
     patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => (j === si ? { ...r, [k]: v } : r)) }))
   const patchType = (ei: number, si: number, t: string) =>
-    patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => (j === si ? { ...r, set: { ...r.set, type: (t || undefined) as SetType | undefined } } : r)) }))
+    patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => {
+      if (j !== si) return r
+      const type = (t || undefined) as SetType | undefined
+      return { ...r, set: { ...r.set, type }, parts: partRows(type, undefined, { weight: toNum(r.weight), reps: toNum(r.reps) }) }
+    }) }))
+  const patchParts = (ei: number, si: number, parts: PartRow[]) =>
+    patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => (j === si ? { ...r, parts } : r)) }))
 
   const addExercise = async (ex: Exercise) => {
     setSheet(null)
@@ -131,7 +143,9 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
 
       {d.entries.map((e, ei) => {
         const ex = exById(e.exerciseId)
-        const fields: Field[] = ex?.kind === 'cardio' ? ['km', 'min'] : ['weight', 'reps']
+        const cardio = ex?.kind === 'cardio'
+        const fields: Field[] = cardio ? ['km', 'min'] : ['weight', 'reps']
+        const unit = (k: Field) => (k === 'reps' && isTimed(ex) ? 's' : UNITS[k])
         return (
           <section key={ei} className="card">
             <div>
@@ -145,16 +159,23 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
                   {fields.map(k => (
                     <label key={k} className="edit-cell">
                       <input inputMode="decimal" autoComplete="off" placeholder="—" value={r[k] ?? ''}
-                        aria-label={`Série ${si + 1}, ${UNITS[k]}`} onChange={ev => patchSet(ei, si, k, ev.target.value)} />
-                      <span className="data">{UNITS[k]}</span>
+                        aria-label={`Série ${si + 1}, ${unit(k)}`} onChange={ev => patchSet(ei, si, k, ev.target.value)} />
+                      <span className="data">{unit(k)}</span>
                     </label>
                   ))}
-                  <select className="edit-type" value={r.set.type ?? ''} aria-label={`Type de la série ${si + 1}`}
-                    onChange={ev => patchType(ei, si, ev.target.value)}>
-                    {SET_TYPES.map(t => <option key={t.label} value={t.id ?? ''}>{t.label}</option>)}
-                  </select>
+                  {!cardio && (
+                    <select className="edit-type" value={r.set.type ?? ''} aria-label={`Type de la série ${si + 1}`}
+                      onChange={ev => patchType(ei, si, ev.target.value)}>
+                      {SET_TYPES.map(t => <option key={t.label} value={t.id ?? ''}>{t.label}</option>)}
+                    </select>
+                  )}
                   <button className="link edit-del" aria-label={`Retirer la série ${si + 1}`}
                     onClick={() => patchEntry(ei, x => ({ ...x, sets: x.sets.filter((_, j) => j !== si) }))}>×</button>
+                  {hasParts(r.set.type) && (
+                    <div className="edit-parts">
+                      <SetParts type={r.set.type} rows={r.parts ?? []} start={{ weight: toNum(r.weight), reps: toNum(r.reps) }} onChange={p => patchParts(ei, si, p)} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>

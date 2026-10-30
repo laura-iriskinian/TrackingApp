@@ -40,6 +40,12 @@
   font: 900 1.6rem var(--f-display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; padding: 0;
 }
 .stepper input:focus { outline: none; }
+@media (max-width: 400px) {
+  .stepper { padding: 10px 6px; }
+  .stepper > div { grid-template-columns: 30px 1fr 30px; }
+  .stepper button { width: 30px; height: 30px; }
+  .stepper input { font-size: 1.1rem; }
+}
 .stepper:focus-within { box-shadow: inset 0 0 0 2px var(--ink); }
 .ok-line { color: var(--ok); font-weight: 600; }
 .cur-tools { flex-wrap: wrap; gap: 4px 14px; }
@@ -132,6 +138,16 @@
 .edit-cell input { width: 100%; min-width: 0; border: 0; background: none; padding: 0; font: 600 1rem var(--f-body); font-variant-numeric: tabular-nums; }
 .edit-cell input:focus { outline: none; }
 .edit-del { font-size: 1.3rem; line-height: 1; color: var(--mute); padding: 4px; }
+.edit-parts { grid-column: 1 / -1; }
+
+/* Paliers d'une dégressive, reprises d'un rest-pause */
+.parts { display: grid; gap: 8px; }
+.part { display: grid; grid-template-columns: 68px 1fr 1fr 26px; gap: 6px; align-items: center; }
+.part.one { grid-template-columns: 68px 1fr 26px; }
+.part > .data { white-space: nowrap; font-size: .75rem; }
+.part .edit-cell { padding: 8px; gap: 4px; }
+.part-add { justify-self: start; }
+.type-hint { margin: 0; }
 .pill:disabled { opacity: .4; cursor: default; }
 
 /* Type de série, ressenti, note, supersets */

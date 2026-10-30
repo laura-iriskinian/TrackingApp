@@ -26,12 +26,19 @@ export type SetType = 'warmup' | 'failure' | 'drop' | 'restpause' | 'pyramid'
 // Ressenti d'effort, facultatif : simple, RPE (1 à 10) ou répétitions en réserve
 export type Feel = 'easy' | 'hard' | 'max'
 
+// Suite d'une série : palier d'une dégressive, ou reprise d'un rest-pause (sans charge : la même que la série)
+export interface SetPart {
+  weight?: number
+  reps?: number
+}
+
 export interface SetLog {
   weight?: number
   reps?: number
   km?: number
   min?: number
   type?: SetType
+  parts?: SetPart[] // étapes après la première, pour les séries dégressives et rest-pause
   feel?: Feel
   rpe?: number
   rir?: number

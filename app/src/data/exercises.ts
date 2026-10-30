@@ -5,6 +5,10 @@ const S = (id: string, name: string, group: string, equipment: Equipment, primar
 const C = (id: string, name: string, primary: Muscle[], secondary: Muscle[] = []): Exercise =>
   ({ id, name, kind: 'cardio', group: 'Cardio', primary, secondary })
 
+// Exercices tenus : la durée, en secondes, est enregistrée dans les répétitions
+const TIMED_IDS = ['gainage', 'gainage-lateral', 'chaise']
+export const isTimed = (ex?: Pick<Exercise, 'id'>) => !!ex && TIMED_IDS.includes(ex.id)
+
 // Les identifiants sont enregistrés dans les séances : ne jamais en changer un
 export const CATALOG: Exercise[] = [
   S('developpe-couche', 'Développé couché', 'Pectoraux', 'barbell', ['pecs'], ['delts', 'triceps']),

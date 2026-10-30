@@ -21,6 +21,9 @@ export function deloadEntry(e: Entry): Entry {
   let n = 0
   const sets = e.sets
     .filter(s => !isWork(s) || n++ < keep)
-    .map(s => (isWork(s) && s.weight ? { ...s, weight: Math.max(0, round(s.weight * 0.6)) } : s))
+    .map(s => (isWork(s) && s.weight ? {
+      ...s, weight: Math.max(0, round(s.weight * 0.6)),
+      ...(s.parts ? { parts: s.parts.map(p => (p.weight ? { ...p, weight: round(p.weight * 0.6) } : p)) } : {}),
+    } : s))
   return { ...e, sets }
 }
