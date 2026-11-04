@@ -58,6 +58,7 @@ export function buildEntry(ex: Exercise, last: SetLog[], item?: Pick<PlanItem, '
       : { weight: p?.weight, reps: p?.reps ?? (goal > 0 ? goal : undefined), done: false }
     if (type) s.type = type
     if (p?.parts && p.type === type) s.parts = p.parts // mêmes paliers que la dernière fois
+    if (p?.left && ex.kind !== 'cardio' && type !== 'drop' && type !== 'restpause') s.left = p.left // côtés notés à part la dernière fois : on continue
     return s
   })
   const e: Entry = { exerciseId: ex.id, sets }
@@ -107,7 +108,9 @@ export function completeSet(s: ActiveSession, ei: number, si: number, values: Om
       if (j > si && !x.done && sameValues(x, before)) {
         // Pyramide : la série suivante en fait partie, mais avec sa propre charge
         if (values.type === 'pyramid') return { ...x, type: values.type }
-        return { ...x, weight: values.weight, reps: values.reps, km: values.km, min: values.min, ...(x.type === values.type && values.parts ? { parts: values.parts } : {}) }
+        const next: SetLog = { ...x, weight: values.weight, reps: values.reps, km: values.km, min: values.min, ...(x.type === values.type && values.parts ? { parts: values.parts } : {}) }
+        if (values.left) next.left = values.left; else delete next.left
+        return next
       }
       return x
     })
@@ -136,6 +139,7 @@ export function restAfter(next: ActiveSession, ei: number, restSec: number, rest
 }
 
 const sameValues = (a: SetLog, b: SetLog) => a.weight === b.weight && a.reps === b.reps && a.km === b.km && a.min === b.min && a.type === b.type
+  && a.left?.weight === b.left?.weight && a.left?.reps === b.left?.reps
 
 export const isFinished = (s: ActiveSession) => s.entries.length > 0 && s.entries.every(e => nextSetIndex(e) < 0)
 export const doneCount = (s: ActiveSession) => s.entries.reduce((a, e) => a + e.sets.filter(x => x.done).length, 0)

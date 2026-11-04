@@ -1,6 +1,6 @@
 import type { Entry, Exercise, Muscle, PlanItem, SetLog } from '../data/types'
 import { fmtNum } from './dates'
-import { isWork, typeShort, typesSummary } from '../data/sets'
+import { isWork, sidesOf, typeShort, typesSummary } from '../data/sets'
 import { isTimed } from '../data/exercises'
 
 const pace = (min: number, km: number) => {
@@ -11,8 +11,10 @@ const pace = (min: number, km: number) => {
 
 const repsText = (r: number | undefined, timed: boolean) => (r == null ? '?' : timed ? r + ' s' : String(r))
 
-// Une série : « 60 kg × 8 », « 60 kg × 8 → 45 kg × 6 » en dégressive, « 60 kg × 8 + 4 + 3 » en rest-pause
+// Une série : « 60 kg × 8 », « 60 kg × 8 → 45 kg × 6 » en dégressive, « 60 kg × 8 + 4 + 3 » en rest-pause,
+// « D 12 kg × 10 · G 10 kg × 8 » quand chaque côté est noté à part
 export function setLine(s: SetLog, timed = false): string {
+  if (s.left) return sidesOf(s).map((x, i) => (i ? 'G ' : 'D ') + setLine(x, timed)).join(' · ')
   const main = `${s.weight != null ? fmtNum(s.weight) + ' kg' : 'poids du corps'} × ${repsText(s.reps, timed)}`
   return main + (s.parts ?? []).map(p => (p.weight != null ? ` → ${fmtNum(p.weight)} kg × ${repsText(p.reps, timed)}` : ` + ${repsText(p.reps, timed)}`)).join('')
 }
@@ -31,21 +33,24 @@ export function entrySummary(e: Entry, ex?: Exercise): string {
   const timed = isTimed(ex)
   const groups: { s: SetLog; key: string; t: string; n: number }[] = []
   for (const s of e.sets) {
-    const last = groups[groups.length - 1], t = typeShort(s.type), key = JSON.stringify([s.weight, s.reps, s.parts])
+    const last = groups[groups.length - 1], t = typeShort(s.type), key = JSON.stringify([s.weight, s.reps, s.parts, s.left])
     if (last && last.key === key && last.t === t) last.n++
     else groups.push({ s, key, t, n: 1 })
   }
   return groups.map(({ s, t, n }) => {
-    const text = s.parts?.length
+    const text = s.parts?.length || s.left
       ? (n > 1 ? `${n} × (${setLine(s, timed)})` : setLine(s, timed))
       : `${n} × ${repsText(s.reps, timed)}${s.weight != null ? ' · ' + fmtNum(s.weight) + ' kg' : ''}`
     return text + (t ? ' ' + t : '')
   }).join(' / ')
 }
 
-// Chaque palier ou reprise compte, à sa charge ou à celle de la série
-export const volume = (sets: SetLog[]) => sets.filter(isWork).reduce((a, s) =>
-  a + (s.weight ?? 0) * (s.reps ?? 0) + (s.parts ?? []).reduce((b, p) => b + (p.weight ?? s.weight ?? 0) * (p.reps ?? 0), 0), 0)
+// Chaque palier ou reprise compte, à sa charge ou à celle de la série.
+// Une série notée côté par côté compte pour la moyenne des deux côtés, comme une série notée une seule fois.
+const setVolume = (s: SetLog): number => s.left
+  ? sidesOf(s).reduce((a, x) => a + (x.weight ?? 0) * (x.reps ?? 0), 0) / 2
+  : (s.weight ?? 0) * (s.reps ?? 0) + (s.parts ?? []).reduce((b, p) => b + (p.weight ?? s.weight ?? 0) * (p.reps ?? 0), 0)
+export const volume = (sets: SetLog[]) => sets.filter(isWork).reduce((a, s) => a + setVolume(s), 0)
 
 // Muscles travaillés par un ensemble d'exercices : un muscle principal quelque part n'est plus secondaire
 export function musclesOf(list: (Exercise | undefined)[]) {

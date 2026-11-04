@@ -4,7 +4,7 @@ import { allExercises, db } from '../data/db'
 import { buildEntry, lastSets } from '../data/session'
 import type { Entry, Exercise, SetLog, SetType } from '../data/types'
 import { hasParts, SET_TYPES } from '../data/sets'
-import { isTimed } from '../data/exercises'
+import { isTimed, sideName, sideOf } from '../data/exercises'
 import { deleteWorkout, saveWorkout } from '../data/workouts'
 import { addDays, fmtNum, longDate, today, weekday } from '../lib/dates'
 import { ExercisePicker } from '../components/ExercisePicker'
@@ -14,7 +14,8 @@ import './Session.css'
 
 // Les champs sont gardés en texte pendant la saisie, pour accepter « 62, » le temps de taper « 62,5 »
 type Field = 'weight' | 'reps' | 'km' | 'min'
-type Row = Partial<Record<Field, string>> & { set: SetLog; parts?: PartRow[] } // set : la série d'origine, pour garder type et ressenti
+// set : la série d'origine, pour garder type et ressenti. left : côté gauche, quand chaque côté est noté à part
+type Row = Partial<Record<Field, string>> & { set: SetLog; parts?: PartRow[]; left?: PartRow }
 interface DraftEntry { exerciseId: string; group?: string; sets: Row[] }
 interface Draft { date: string; title?: string; entries: DraftEntry[] }
 
@@ -25,14 +26,18 @@ const toNum = (v?: string) => {
   const n = parseFloat((v ?? '').replace(',', '.'))
   return Number.isFinite(n) && n >= 0 ? n : undefined
 }
+const fmt = (n?: number) => (n != null ? fmtNum(n) : '')
 const toRow = (s: SetLog): Row => ({
   set: s, parts: partRows(s.type, s.parts, s), ...Object.fromEntries(FIELDS.filter(k => s[k] != null).map(k => [k, fmtNum(s[k]!)])),
+  ...(s.left ? { left: { weight: fmt(s.left.weight), reps: fmt(s.left.reps) } } : {}),
 })
-const toSet = ({ set, parts, ...r }: Row): SetLog => {
+const toSet = ({ set, parts, left, ...r }: Row): SetLog => {
   const out: SetLog = { ...set, done: true }
   for (const k of FIELDS) { const n = toNum(r[k]); if (n != null) out[k] = n; else delete out[k] }
   const steps = rowsToParts(parts ?? [])
   if (steps.length) out.parts = steps; else delete out.parts
+  const side = left && !hasParts(set.type) ? rowsToParts([left])[0] : undefined
+  if (side) out.left = side; else delete out.left
   return out
 }
 const toEntries = (d: Draft): Entry[] => d.entries.map(e => ({ ...(e.group ? { group: e.group } : {}), exerciseId: e.exerciseId, sets: e.sets.map(toSet) }))
@@ -99,6 +104,11 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
     }) }))
   const patchParts = (ei: number, si: number, parts: PartRow[]) =>
     patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => (j === si ? { ...r, parts } : r)) }))
+  const patchLeft = (ei: number, si: number, k: keyof PartRow, v: string) =>
+    patchEntry(ei, e => ({ ...e, sets: e.sets.map((r, j) => (j === si && r.left ? { ...r, left: { ...r.left, [k]: v } } : r)) }))
+  // Chaque côté à part : le côté gauche part des valeurs de la série ; sinon il est retiré
+  const toggleSides = (ei: number, on: boolean) =>
+    patchEntry(ei, e => ({ ...e, sets: e.sets.map(({ left: _, ...r }) => (on ? { ...r, left: { weight: r.weight ?? '', reps: r.reps ?? '' } } : r)) }))
 
   const addExercise = async (ex: Exercise) => {
     setSheet(null)
@@ -146,6 +156,8 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
         const cardio = ex?.kind === 'cardio'
         const fields: Field[] = cardio ? ['km', 'min'] : ['weight', 'reps']
         const unit = (k: Field) => (k === 'reps' && isTimed(ex) ? 's' : UNITS[k])
+        const limb = cardio ? undefined : sideOf(ex)
+        const sided = e.sets.some(r => r.left)
         return (
           <section key={ei} className="card">
             <div>
@@ -159,7 +171,7 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
                   {fields.map(k => (
                     <label key={k} className="edit-cell">
                       <input inputMode="decimal" autoComplete="off" placeholder="—" value={r[k] ?? ''}
-                        aria-label={`Série ${si + 1}, ${unit(k)}`} onChange={ev => patchSet(ei, si, k, ev.target.value)} />
+                        aria-label={`Série ${si + 1}${r.left ? ', ' + sideName(limb!, true).toLowerCase() : ''}, ${unit(k)}`} onChange={ev => patchSet(ei, si, k, ev.target.value)} />
                       <span className="data">{unit(k)}</span>
                     </label>
                   ))}
@@ -176,11 +188,30 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
                       <SetParts type={r.set.type} rows={r.parts ?? []} start={{ weight: toNum(r.weight), reps: toNum(r.reps) }} onChange={p => patchParts(ei, si, p)} />
                     </div>
                   )}
+                  {limb && r.left && !hasParts(r.set.type) && (
+                    <div className="edit-parts">
+                      <div className="part">
+                        <span className="data">Gauche</span>
+                        {(['weight', 'reps'] as const).map(k => (
+                          <label key={k} className="edit-cell">
+                            <input inputMode="decimal" autoComplete="off" placeholder="—" value={r.left![k]}
+                              aria-label={`Série ${si + 1}, ${sideName(limb, false).toLowerCase()}, ${unit(k)}`} onChange={ev => patchLeft(ei, si, k, ev.target.value)} />
+                            <span className="data">{unit(k)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>
             <div className="row cur-tools">
               <button className="link" onClick={() => patchEntry(ei, x => ({ ...x, sets: [...x.sets, x.sets.length ? { ...x.sets[x.sets.length - 1], set: { type: x.sets[x.sets.length - 1].set.type, done: true } } : { set: { done: true } }] }))}>+ Série</button>
+              {limb && (
+                <button className="link" aria-pressed={sided} onClick={() => toggleSides(ei, !sided)}>
+                  {sided ? 'Mêmes valeurs des deux côtés' : limb === 'côté' ? 'Noter chaque côté à part' : `Noter chaque ${limb} à part`}
+                </button>
+              )}
               <button className="link" onClick={() => patchEntry(ei, () => null)}>Retirer l'exercice</button>
             </div>
           </section>

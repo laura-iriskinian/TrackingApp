@@ -46,3 +46,28 @@ describe('séries à plusieurs étapes', () => {
     expect(checkBackup(file([{ ...drop, parts: [{ weight: 'x', reps: 3 }] }])).skipped).toBe(1)
   })
 })
+
+describe('chaque côté noté à part', () => {
+  const rowing = CATALOG.find(e => e.id === 'rowing-haltere')
+  const sided = { weight: 12, reps: 10, left: { weight: 10, reps: 8 }, done: true }
+
+  it('affiche les deux côtés', () => {
+    expect(setLine(sided)).toBe('D 12 kg × 10 · G 10 kg × 8')
+    expect(entrySummary({ exerciseId: 'rowing-haltere', sets: [sided, sided] }, rowing)).toBe('2 × (D 12 kg × 10 · G 10 kg × 8)')
+  })
+
+  it('compte la moyenne des deux côtés dans le volume', () => {
+    expect(volume([sided])).toBe((120 + 80) / 2)
+    expect(volume([{ weight: 12, reps: 10, done: true }])).toBe(120)
+  })
+
+  it('garde le meilleur côté pour les records', () => {
+    expect(bestOf([{ weight: 10, reps: 8, left: { weight: 14, reps: 5 }, done: true }]).weight).toBe(14)
+  })
+
+  it('vérifie le côté gauche à la restauration', () => {
+    const file = (sets: unknown[]) => JSON.stringify({ app: 'NextRep', format: 2, data: { workouts: [{ id: 'w', date: '2026-10-01', entries: [{ exerciseId: 'rowing-haltere', sets }] }] } })
+    expect(checkBackup(file([sided])).rows.workouts[0].entries[0].sets[0].left).toEqual(sided.left)
+    expect(checkBackup(file([{ ...sided, left: { weight: -1, reps: 3 } }])).skipped).toBe(1)
+  })
+})

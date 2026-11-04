@@ -47,6 +47,8 @@
   .stepper input { font-size: 1.1rem; }
 }
 .stepper:focus-within { box-shadow: inset 0 0 0 2px var(--ink); }
+.side-name { font-size: .75rem; font-weight: 600; color: var(--mute); margin-bottom: -4px; }
+.side-toggle { justify-self: start; }
 .ok-line { color: var(--ok); font-weight: 600; }
 .cur-tools { flex-wrap: wrap; gap: 4px 14px; }
 .cur-tools > * { flex: 0 0 auto; }

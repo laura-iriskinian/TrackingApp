@@ -97,7 +97,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
   }
   const cyc = cycleWeek(profile.cycle, today())
   const setCycle = (patch: Partial<NonNullable<typeof profile.cycle>> | null) => saveProfile({
-    cycle: patch === null ? undefined : { start: profile.cycle?.start ?? weekStartOf(today(), profile.weekStart), weeks: 4, deload: true, ...profile.cycle, ...patch },
+    cycle: patch === null ? undefined : { start: profile.cycle?.start ?? weekStartOf(today()), weeks: 4, deload: true, ...profile.cycle, ...patch },
   })
   const count = (d: number) => plans.find(p => p.weekday === d)?.items.length ?? 0
 
@@ -226,7 +226,7 @@ export function Planning({ onClose }: { onClose: () => void }) {
               <span>Dernière semaine allégée</span>
             </label>
             <div className="row cur-tools">
-              <button className="link" onClick={() => setCycle({ start: weekStartOf(today(), profile.weekStart) })}>Recommencer cette semaine</button>
+              <button className="link" onClick={() => setCycle({ start: weekStartOf(today()) })}>Recommencer cette semaine</button>
               <button className="link" onClick={() => setCycle(null)}>Arrêter le cycle</button>
             </div>
           </>

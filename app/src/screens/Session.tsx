@@ -6,14 +6,14 @@ import {
   nextSetIndex, REST_CHOICES, restAfter, restLabel, saveSession, type ActiveSession,
 } from '../data/session'
 import { effortLabel, FEELS, hasParts, isWork, newGroupId, SET_TYPES, typeShort } from '../data/sets'
-import { isTimed, MUSCLE_LABEL } from '../data/exercises'
+import { isTimed, MUSCLE_LABEL, sideName, sideOf } from '../data/exercises'
 import { alternatives, suggestNext, warmupSets } from '../lib/coach'
 import { PlatesSheet } from '../components/Plates'
 import type { Entry, Exercise, Profile, SetLog, SetType, Workout } from '../data/types'
 import { fmtNum, fmtThousands } from '../lib/dates'
 import { keepAwake, restOver, unlockAudio } from '../lib/signal'
 import { entrySummary, fmtTarget, musclesOf, setLine, volume } from '../lib/summary'
-import { e1rm, recordBeaten, setsOf } from '../lib/records'
+import { bestOf, recordBeaten, setsOf } from '../lib/records'
 import { ExercisePicker } from '../components/ExercisePicker'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { partRows, rowsToParts, SetParts, type PartRow } from '../components/SetParts'
@@ -108,8 +108,8 @@ export function Session({ onClose }: { onClose: () => void }) {
     const past = setsOf(await db.workouts.where('exerciseIds').equals(id).toArray(), id)
     const today = cur.entries.filter(e => e.exerciseId === id).flatMap(e => e.sets.filter(x => x.done))
     const r = recordBeaten([...past, ...today], { ...values, done: true })
-    if (r === 'weight') toast(`Nouveau record : ${fmtNum(values.weight!)} kg`)
-    else if (r === 'e1rm') toast(`Nouveau record : 1RM estimé ${fmtNum(Math.round(e1rm({ ...values, done: true }) * 2) / 2)} kg`)
+    if (r === 'weight') toast(`Nouveau record : ${fmtNum(bestOf([{ ...values, done: true }]).weight)} kg`)
+    else if (r === 'e1rm') toast(`Nouveau record : 1RM estimé ${fmtNum(Math.round(bestOf([{ ...values, done: true }]).e1rm * 2) / 2)} kg`)
   }
 
   // Lie l'exercice affiché au suivant, ou le détache de son groupe
@@ -273,20 +273,47 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
   const [vals, setVals] = useState<Record<string, string>>({})
   const [parts, setParts] = useState<PartRow[]>([])
   const [effort, setEffort] = useState<Pick<SetLog, 'feel' | 'rpe' | 'rir'>>({})
+  // Exercice fait un côté à la fois : chaque côté peut être noté à part (le droit dans vals, le gauche dans lvals)
+  const limb = cardio ? undefined : sideOf(ex)
+  const [split, setSplit] = useState(false)
+  const [lvals, setLvals] = useState<Record<string, string>>({})
   useEffect(() => {
     setVals(Object.fromEntries(fields.map(f => [f.k, set?.[f.k] != null ? fmtNum(set[f.k]!) : ''])))
+    setSplit(!!set?.left || entry.sets.some(x => x.done && x.left))
+    const l = set?.left ?? set
+    setLvals({ weight: l?.weight != null ? fmtNum(l.weight) : '', reps: l?.reps != null ? fmtNum(l.reps) : '' })
     setType(set?.type)
     setParts(partRows(set?.type, set?.parts, { weight: set?.weight, reps: set?.reps }))
     setEffort({})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [si, entry.sets.length])
 
-  const step = (k: string, d: number) => setVals(v => {
-    const n = Math.max(0, (toNum(v[k] ?? '') ?? 0) + d)
-    return { ...v, [k]: fmtNum(n) }
-  })
-  const values = Object.fromEntries(fields.map(f => [f.k, toNum(vals[f.k] ?? '')]))
-  const canValidate = cardio ? values.km != null || values.min != null : values.reps != null
+  const bump = (v: Record<string, string>, k: string, d: number) => ({ ...v, [k]: fmtNum(Math.max(0, (toNum(v[k] ?? '') ?? 0) + d)) })
+  const step = (k: string, d: number, left = false) => (left ? setLvals : setVals)(v => bump(v, k, d))
+  const values: Omit<SetLog, 'done'> = Object.fromEntries(fields.map(f => [f.k, toNum(vals[f.k] ?? '')]))
+  const sided = !!limb && split && !hasParts(type)
+  if (sided) values.left = { weight: toNum(lvals.weight ?? ''), reps: toNum(lvals.reps ?? '') }
+  const canValidate = cardio ? values.km != null || values.min != null : values.reps != null && (!sided || values.left?.reps != null)
+  const toggleSplit = () => {
+    if (!split) setLvals({ weight: vals.weight ?? '', reps: vals.reps ?? '' }) // on part des mêmes valeurs que l'autre côté
+    setSplit(!split)
+  }
+  const stepper = (f: typeof fields[number], left: boolean) => {
+    const v = left ? lvals : vals, id = 'st-' + f.k + (left ? '-g' : '')
+    const label = sided ? `${f.label}, ${sideName(limb!, !left).toLowerCase()}` : f.label
+    return (
+      <div key={id} className="stepper">
+        <label htmlFor={id}>{f.label}</label>
+        <div>
+          <button aria-label={`${label} moins ${fmtNum(f.step)}`} onClick={() => step(f.k, -f.step, left)}>−</button>
+          <input id={id} inputMode="decimal" autoComplete="off" value={v[f.k] ?? ''} placeholder="0" aria-label={label}
+            onChange={e => (left ? setLvals : setVals)(x => ({ ...x, [f.k]: e.target.value }))} />
+          <button aria-label={`${label} plus ${fmtNum(f.step)}`} onClick={() => step(f.k, f.step, left)}>+</button>
+        </div>
+        <span className="data">{f.unit}</span>
+      </div>
+    )
+  }
   const pickType = (t: SetType | undefined) => {
     if (t === type) return
     setType(t)
@@ -358,31 +385,32 @@ function Current({ s, entry, ex, effortMode, barKg, onValidate, onPatch, onLink,
           {showSug && (
             <button className="suggest" onClick={() => {
               // Appliquée à toutes les séries de travail prévues avec les mêmes valeurs
+              // Côté par côté : le côté gauche monte d'autant, depuis sa propre charge
               const from = { weight: set!.weight, reps: set!.reps }
-              onPatch(e => ({ ...e, sets: e.sets.map(x => (!x.done && isWork(x) && x.weight === from.weight && x.reps === from.reps ? { ...x, weight: sug.weight ?? x.weight, reps: sug.reps } : x)) }))
+              const up = sug.weight != null && from.weight != null ? sug.weight - from.weight : 0
+              const leftOf = (l: SetLog['left']) => l && { weight: l.weight != null ? l.weight + up : l.weight, reps: sug.reps }
+              onPatch(e => ({ ...e, sets: e.sets.map(x => (!x.done && isWork(x) && x.weight === from.weight && x.reps === from.reps ? { ...x, weight: sug.weight ?? x.weight, reps: sug.reps, ...(x.left ? { left: leftOf(x.left) } : {}) } : x)) }))
               setVals(v => ({ ...v, weight: sug.weight != null ? fmtNum(sug.weight) : v.weight, reps: String(sug.reps) }))
+              setLvals(v => ({ weight: v.weight && up ? fmtNum((toNum(v.weight) ?? 0) + up) : v.weight, reps: String(sug.reps) }))
             }}>
               <b>Essaie {sug.weight != null ? fmtNum(sug.weight) + ' kg × ' + sug.reps : sug.reps + (timed ? ' s' : ' répétitions')}{sug.weight != null && timed ? ' s' : ''}</b>
               <span>Tout réussi la dernière fois, sans aller à la limite. Touche pour l'appliquer.</span>
             </button>
           )}
-          <div className="steppers">
-            {fields.map(f => (
-              <div key={f.k} className="stepper">
-                <label htmlFor={'st-' + f.k}>{f.label}</label>
-                <div>
-                  <button aria-label={`${f.label} moins ${fmtNum(f.step)}`} onClick={() => step(f.k, -f.step)}>−</button>
-                  <input id={'st-' + f.k} inputMode="decimal" autoComplete="off" value={vals[f.k] ?? ''} placeholder="0"
-                    onChange={e => setVals(v => ({ ...v, [f.k]: e.target.value }))} />
-                  <button aria-label={`${f.label} plus ${fmtNum(f.step)}`} onClick={() => step(f.k, f.step)}>+</button>
-                </div>
-                <span className="data">{f.unit}</span>
-              </div>
-            ))}
-          </div>
+          {sided && <span className="side-name">{sideName(limb!, true)}</span>}
+          <div className="steppers">{fields.map(f => stepper(f, false))}</div>
+          {sided && <>
+            <span className="side-name">{sideName(limb!, false)}</span>
+            <div className="steppers">{fields.map(f => stepper(f, true))}</div>
+          </>}
+          {limb && !hasParts(type) && (
+            <button className="link side-toggle" aria-pressed={split} onClick={toggleSplit}>
+              {split ? 'Mêmes valeurs des deux côtés' : limb === 'côté' ? 'Noter chaque côté à part' : `Noter chaque ${limb} à part`}
+            </button>
+          )}
           {hasParts(type) && <SetParts type={type} rows={parts} start={{ weight: values.weight, reps: values.reps }} onChange={setParts} />}
           {effortMode !== 'off' && <EffortPicker mode={effortMode} value={effort} onChange={setEffort} />}
-          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(ei, si, { ...values, type, parts: cleanParts.length ? cleanParts : undefined, ...effort })}>
+          <button className="btn go" disabled={!canValidate} onClick={() => onValidate(ei, si, { ...values, type, parts: cleanParts.length ? cleanParts : undefined, left: sided ? values.left : undefined, ...effort })}>
             Valider la série {si + 1}
           </button>
         </div>

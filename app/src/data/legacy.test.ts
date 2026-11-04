@@ -60,7 +60,7 @@ describe('récupération depuis Suivi sport', () => {
     expect((await db.goals.toArray())[0]).toMatchObject({ metric: 'max-weight:squat', target: 100, start: 80, direction: 'up' })
 
     const p = await getProfile()
-    expect(p).toMatchObject({ name: 'Laura', age: 30, heightCm: 170, sex: 'f', weekStart: 2 })
+    expect(p).toMatchObject({ name: 'Laura', age: 30, heightCm: 170, sex: 'f', weekStart: 0 })
     expect(p.nutritionTargets.protein).toBe(120)
   })
 

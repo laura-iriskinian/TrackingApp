@@ -24,6 +24,7 @@ export function deloadEntry(e: Entry): Entry {
     .map(s => (isWork(s) && s.weight ? {
       ...s, weight: Math.max(0, round(s.weight * 0.6)),
       ...(s.parts ? { parts: s.parts.map(p => (p.weight ? { ...p, weight: round(p.weight * 0.6) } : p)) } : {}),
+      ...(s.left?.weight ? { left: { ...s.left, weight: Math.max(0, round(s.left.weight * 0.6)) } } : {}),
     } : s))
   return { ...e, sets }
 }

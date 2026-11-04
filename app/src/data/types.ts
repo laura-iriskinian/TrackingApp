@@ -39,6 +39,7 @@ export interface SetLog {
   min?: number
   type?: SetType
   parts?: SetPart[] // étapes après la première, pour les séries dégressives et rest-pause
+  left?: SetPart // côté gauche, noté à part sur un exercice fait un côté à la fois : weight et reps sont alors le côté droit
   feel?: Feel
   rpe?: number
   rir?: number

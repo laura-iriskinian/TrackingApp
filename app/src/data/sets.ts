@@ -15,6 +15,9 @@ export const typeShort = (t?: SetType | null) => SET_TYPES.find(x => x.id === (t
 // Les séries d'échauffement ne comptent ni dans le volume ni dans les records
 export const isWork = (s: SetLog) => s.type !== 'warmup'
 
+// Les deux côtés d'une série notée côté par côté (le droit d'abord), sinon la série seule
+export const sidesOf = (s: SetLog): SetLog[] => (s.left ? [{ ...s, left: undefined }, { ...s, weight: s.left.weight, reps: s.left.reps, parts: undefined, left: undefined }] : [s])
+
 // Types de séries faits de plusieurs étapes
 export const hasParts = (t?: SetType | null) => t === 'drop' || t === 'restpause'
 export const partName = (t?: SetType | null) => (t === 'drop' ? 'Palier' : 'Reprise')

@@ -35,9 +35,11 @@ function setLog(v: unknown): SetLog | undefined {
   if (!isObj(v)) return
   const parts = list(v.parts, 20)?.map(setPart)
   if (v.parts != null && (!parts || parts.some(p => !p))) return
+  const left = v.left != null ? setPart(v.left) : undefined
+  if (v.left != null && !left) return
   const out = pick({
     weight: num(v.weight, 0, 2000), reps: num(v.reps, 0, 1000), km: num(v.km, 0, 1000), min: num(v.min, 0, 10000),
-    type: oneOf(v.type, SET_TYPE_IDS), parts: parts?.length ? parts as SetPart[] : undefined, feel: oneOf(v.feel, ['easy', 'hard', 'max'] as const),
+    type: oneOf(v.type, SET_TYPE_IDS), parts: parts?.length ? parts as SetPart[] : undefined, left, feel: oneOf(v.feel, ['easy', 'hard', 'max'] as const),
     rpe: num(v.rpe, 1, 10), rir: num(v.rir, 0, 20), done: v.done !== false,
   })
   // Une valeur présente mais invalide (texte, négative…) : la série entière est écartée

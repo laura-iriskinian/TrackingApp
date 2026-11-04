@@ -73,3 +73,11 @@ describe('récupération et régularité', () => {
     expect(remindersIcs([{ weekday: 0, title: 'A\\B; C', items: [{ exerciseId: 'squat' }], updatedAt: 0 }], '07:00', '2026-10-29')).toContain('SUMMARY:Séance : A\\\\B\\; C')
   })
 })
+
+describe('progression côté par côté', () => {
+  it('ne propose rien si un côté a raté ses répétitions', () => {
+    const s = (lr: number) => ({ weight: 12, reps: 10, left: { weight: 12, reps: lr }, done: true })
+    expect(suggestNext([s(10), s(8)])).toBeNull()
+    expect(suggestNext([s(10), s(10)])).toEqual({ weight: 14.5, reps: 10 })
+  })
+})

@@ -122,7 +122,7 @@ export function convertLegacy(p: Obj, prefs: Obj = {}) {
     age: num(prof.age),
     heightCm: num(prof.h),
     sex: prof.sex === 'f' || prof.sex === 'h' ? prof.sex : undefined,
-    weekStart: Number.isInteger(prof.ws) ? (prof.ws as number) : 0,
+    weekStart: 0,
     nutritionTargets: {
       kcal: num(ng.kcal) ?? DEFAULT_PROFILE.nutritionTargets.kcal,
       protein: num(ng.p) ?? DEFAULT_PROFILE.nutritionTargets.protein,

@@ -1,11 +1,11 @@
-import { isWork } from '../data/sets'
+import { isWork, sidesOf } from '../data/sets'
 import type { Exercise, SetLog } from '../data/types'
 
 // Progression suggérée : si toutes les séries de travail de la dernière fois ont atteint les répétitions
 // de la première série, sans effort maximal, on propose un peu plus de charge (ou une répétition de plus sans charge).
 // Rien n'est proposé après des séries à l'échec, dégressives, rest-pause ou pyramidales : leur but est ailleurs.
 export function suggestNext(last: SetLog[]): { weight?: number; reps: number } | null {
-  const work = last.filter(isWork)
+  const work = last.filter(isWork).flatMap(sidesOf) // côté par côté : les deux côtés doivent avoir tout réussi
   if (!work.length || work.some(s => s.type)) return null
   const target = work[0].reps
   if (!target || work.some(s => (s.reps ?? 0) < target)) return null

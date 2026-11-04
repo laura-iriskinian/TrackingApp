@@ -9,6 +9,17 @@ const C = (id: string, name: string, primary: Muscle[], secondary: Muscle[] = []
 const TIMED_IDS = ['gainage', 'gainage-lateral', 'chaise']
 export const isTimed = (ex?: Pick<Exercise, 'id'>) => !!ex && TIMED_IDS.includes(ex.id)
 
+// Exercices faits un côté à la fois : chaque côté peut être noté à part, si on le souhaite
+const ONE_SIDE: Record<string, 'bras' | 'jambe' | 'côté'> = {
+  'rowing-haltere': 'bras', 'kickback-triceps': 'bras', 'elevations-laterales-poulie': 'bras', 'curl-halteres': 'bras', 'curl-marteau': 'bras',
+  'fentes': 'jambe', 'fentes-bulgares': 'jambe', 'montees-banc': 'jambe', 'extension-hanche-poulie': 'jambe',
+  'gainage-lateral': 'côté',
+}
+export const sideOf = (ex?: Pick<Exercise, 'id'>) => (ex ? ONE_SIDE[ex.id] : undefined)
+// « Bras droit », « Jambe gauche », « Côté droit »
+export const sideName = (limb: 'bras' | 'jambe' | 'côté', right: boolean) =>
+  limb[0].toUpperCase() + limb.slice(1) + ' ' + (right ? (limb === 'jambe' ? 'droite' : 'droit') : 'gauche')
+
 // Les identifiants sont enregistrés dans les séances : ne jamais en changer un
 export const CATALOG: Exercise[] = [
   S('developpe-couche', 'Développé couché', 'Pectoraux', 'barbell', ['pecs'], ['delts', 'triceps']),

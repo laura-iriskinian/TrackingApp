@@ -32,8 +32,8 @@ export function Home() {
   const exById = (id: string) => exercises.find(e => e.id === id)
   const planOf = (d: string) => plans.find(p => p.weekday === weekday(d) && (p.title || p.items.length))
 
-  const weekStart = weekStartOf(t, profile?.weekStart ?? 0)
-  const shownStart = weekStartOf(sel, profile?.weekStart ?? 0)
+  const weekStart = weekStartOf(t)
+  const shownStart = weekStartOf(sel)
   const week = Array.from({ length: 7 }, (_, i) => addDays(shownStart, i))
   const shown = useLiveQuery(() => db.workouts.where('date').between(week[0], week[6], true, true).toArray(), [week[0]]) ?? []
   // Séance faite pour ce jour : le jour même, ou décalée à un autre jour. Une séance décalée
@@ -46,8 +46,8 @@ export function Home() {
   const allDates = useLiveQuery(async () => (await db.workouts.orderBy('date').keys()) as string[]) ?? []
   const target = profile?.weeklyTarget ?? 3
   const pauses = profile?.pauseWeeks ?? []
-  const reg = streak(allDates, target, pauses, t, profile?.weekStart ?? 0)
-  const togglePause = () => saveProfile({ pauseWeeks: reg.paused ? pauses.filter(w => w !== weekStart) : [...pauses, weekStart] })
+  const reg = streak(allDates, target, pauses, t)
+  const togglePause = () => saveProfile({ pauseWeeks: reg.paused ? pauses.filter(w => weekStartOf(w) !== weekStart) : [...pauses, weekStart] })
   const tired = recovery(recent, exercises, t)
   const names = (lv: number[]) => (Object.entries(tired) as [Muscle, number][]).filter(([, l]) => lv.includes(l)).map(([m]) => MUSCLE_LABEL[m])
   const sessionsThisMonth = recent.filter(w => w.date.startsWith(month)).length

@@ -1,4 +1,4 @@
-import { isWork } from '../data/sets'
+import { isWork, sidesOf } from '../data/sets'
 import type { Measure, SetLog, Workout } from '../data/types'
 import { volume } from './summary'
 
@@ -8,10 +8,10 @@ export const e1rm = (s: SetLog) =>
 
 export interface Best { weight: number; e1rm: number; km: number; min: number }
 
-// Meilleures valeurs sur un ensemble de séries, échauffements exclus
+// Meilleures valeurs sur un ensemble de séries, échauffements exclus. Côté par côté : le meilleur des deux.
 export function bestOf(sets: SetLog[]): Best {
   const b: Best = { weight: 0, e1rm: 0, km: 0, min: 0 }
-  for (const s of sets.filter(isWork)) {
+  for (const s of sets.filter(isWork).flatMap(sidesOf)) {
     b.weight = Math.max(b.weight, s.weight ?? 0)
     b.e1rm = Math.max(b.e1rm, e1rm(s))
     b.km = Math.max(b.km, s.km ?? 0)
@@ -25,10 +25,11 @@ export const setsOf = (workouts: Workout[], exerciseId: string) =>
 
 // Record battu par cette série par rapport aux séries d'avant : charge, sinon 1RM estimé
 export function recordBeaten(before: SetLog[], s: SetLog): 'weight' | 'e1rm' | null {
-  if (!isWork(s) || !s.weight || !before.some(x => isWork(x) && x.weight)) return null
-  const b = bestOf(before)
-  if (s.weight > b.weight) return 'weight'
-  if (e1rm(s) > b.e1rm + 0.01) return 'e1rm'
+  if (!isWork(s) || !before.some(x => isWork(x) && x.weight)) return null
+  const b = bestOf(before), now = bestOf([s])
+  if (!now.weight) return null
+  if (now.weight > b.weight) return 'weight'
+  if (now.e1rm > b.e1rm + 0.01) return 'e1rm'
   return null
 }
 
