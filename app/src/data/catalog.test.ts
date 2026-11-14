@@ -57,12 +57,17 @@ describe('programmes', () => {
 
   beforeEach(async () => { await eraseAll() })
 
-  it('remplace le planning et règle l’objectif de séances', async () => {
-    await db.plans.put({ weekday: 6, title: 'Ancien', items: [{ exerciseId: 'squat' }], updatedAt: 1 })
+  it('ajoute les séances du programme, prend la semaine et règle l’objectif de séances', async () => {
+    await db.templates.put({ id: 'old', title: 'Ancien', days: [6], items: [{ exerciseId: 'squat' }], updatedAt: 1 })
     const p = PROGRAMS.find(x => x.id === 'corps-entier-3')!
     await applyProgram(p, [4, 0, 2])
-    const plans = await db.plans.orderBy('weekday').toArray()
-    expect(plans.map(x => [x.weekday, x.title])).toEqual([[0, 'Corps entier A'], [2, 'Corps entier B'], [4, 'Corps entier C']])
+    const list = await db.templates.toArray()
+    expect(list.filter(x => x.days).map(x => [x.days, x.title]).sort()).toEqual([[[0], 'Corps entier A'], [[2], 'Corps entier B'], [[4], 'Corps entier C']])
+    expect(list.find(x => x.id === 'old')).toMatchObject({ title: 'Ancien' })
+    expect(list.find(x => x.id === 'old')?.days).toBeUndefined()
+    // Appliqué une seconde fois, sans jours : rien n'est dupliqué et les autres séances gardent leurs jours
+    await applyProgram(p, [])
+    expect(await db.templates.count()).toBe(4)
     const prof = await getProfile()
     expect(prof.program).toBe('corps-entier-3')
     expect(prof.weeklyTarget).toBe(3)

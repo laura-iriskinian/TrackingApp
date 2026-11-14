@@ -23,11 +23,11 @@ const TABS = [
   { id: 'profil', label: 'Profil', icon: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, Screen: Profile },
 ] as const
 
-type TabId = (typeof TABS)[number]['id'] | 'seance' | 'planning' | 'chrono' | 'exercices' | 'programmes' | `seance-passee${string}` | `infos${string}`
+type TabId = (typeof TABS)[number]['id'] | 'seance' | `planning${string}` | 'chrono' | 'exercices' | 'programmes' | `seance-passee${string}` | `infos${string}`
 const FULL = ['seance', 'planning', 'chrono', 'exercices', 'programmes']
 const fromHash = (): TabId => {
   const h = location.hash.slice(1)
-  if (FULL.includes(h) || h === 'seance-passee' || h.startsWith('seance-passee/') || h.startsWith('infos')) return h as TabId
+  if (FULL.includes(h) || h === 'seance-passee' || h.startsWith('seance-passee/') || h.startsWith('planning/') || h.startsWith('infos')) return h as TabId
   return TABS.find(t => t.id === h)?.id ?? 'accueil'
 }
 
@@ -57,7 +57,8 @@ export default function App() {
   if (onboarding === undefined) return null
   if (onboarding) return full(<Onboarding />)
   if (tab === 'seance') return full(<Session onClose={() => go('accueil')} />)
-  if (tab === 'planning') return full(<Planning onClose={() => go(backTo('accueil') as TabId)} />)
+  // « planning/<id> » ouvre directement une séance de la liste
+  if (tab === 'planning' || tab.startsWith('planning/')) return full(<Planning key={tab} openId={tab.slice(9) || undefined} onClose={() => go(backTo('accueil') as TabId)} />)
   if (tab === 'exercices') return full(<Exercises onClose={() => go(backTo('seances') as TabId)} />)
   if (tab === 'programmes') return full(<Programs onClose={() => go(backTo('seances') as TabId)} />)
   if (tab === 'chrono') return full(<Timer onClose={() => go(backTo('seances') as TabId)} />)

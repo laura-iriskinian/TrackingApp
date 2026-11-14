@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
-import { TemplatePicker } from '../components/Templates'
+import { SessionPicker } from '../components/Templates'
 import { allExercises, db } from '../data/db'
 import { longDate, MONTHS, parse } from '../lib/dates'
 import { entrySummary } from '../lib/summary'
@@ -13,8 +13,9 @@ export function Workouts() {
   const exById = (id: string) => exercises.find(e => e.id === id)
   const active = useLiveQuery(getSession)
   const [tpl, setTpl] = useState(false)
-  const start = async () => {
-    if (!active) await startSession(undefined, [], exercises)
+  const start = async (title?: string, items: Parameters<typeof startSession>[1] = []) => {
+    setTpl(false)
+    if (!active) await startSession(title, items, exercises)
     openSession()
   }
 
@@ -29,12 +30,11 @@ export function Workouts() {
       <header className="head w-top">
         <h1>Séances</h1>
         <div className="row">
-          <button className="pill soft" onClick={openPlanning}>Planning</button>
+          <button className="pill soft" onClick={() => openPlanning()}>Mes séances</button>
           <button className="pill soft" onClick={openTimer}>Minuteur</button>
         </div>
       </header>
-      <button className="btn go" onClick={start}>{active ? 'Reprendre la séance en cours' : 'Nouvelle séance'}</button>
-      {!active && <button className="btn soft" onClick={() => setTpl(true)}>Partir d'un modèle</button>}
+      <button className="btn go" onClick={() => (active ? openSession() : setTpl(true))}>{active ? 'Reprendre la séance en cours' : 'Commencer une séance'}</button>
       <button className="btn soft" onClick={() => openWorkoutEdit()}>Ajouter une séance passée</button>
       <div className="row">
         <button className="btn soft" onClick={openPrograms}>Programmes</button>
@@ -52,8 +52,8 @@ export function Workouts() {
       )}
 
       {tpl && (
-        <TemplatePicker title="Lancer un modèle" onClose={() => setTpl(false)}
-          onPick={async t => { setTpl(false); await startSession(t.title, t.items, exercises); openSession() }} />
+        <SessionPicker title="Quelle séance ?" onClose={() => setTpl(false)}
+          onPick={r => start(r.title, r.items)} onFree={() => start()} onManage={() => { setTpl(false); openPlanning() }} />
       )}
 
       {[...byMonth].map(([month, list]) => (

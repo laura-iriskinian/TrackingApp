@@ -7,6 +7,7 @@
 // Si une ligne a changé des deux côtés, la modification la plus récente l'emporte.
 import { db } from './db'
 import { ROWS } from './backup'
+import { absorbPlans } from './routines'
 
 export const KINDS = ['workouts', 'measures', 'measureKinds', 'foods', 'plans', 'goals', 'exercises', 'notes', 'templates', 'kv'] as const
 export type Kind = (typeof KINDS)[number]
@@ -153,6 +154,9 @@ export async function sync(remote: Remote, choice?: Choice): Promise<SyncResult>
       else delete hashes[key]
     }
   })
+
+  // Un ancien planning par jour reçu d'un autre appareil devient une liste de séances, envoyée à son tour
+  if (await db.transaction('rw', db.plans, db.templates, () => absorbPlans(n => db.table(n)))) local = await readLocal()
 
   // Ce qui a changé sur ce téléphone depuis la dernière fois
   const now = Date.now()

@@ -4,6 +4,7 @@ import { LEGACY_KEY, LEGACY_PREFS_KEY } from '../config'
 import { db, DATA_TABLES, newId, DEFAULT_PROFILE } from './db'
 import { findByName, slug } from './exercises'
 import { migrateItems } from './sets'
+import { absorbPlans } from './routines'
 import type { Exercise, Food, Goal, Measure, MeasureKind, Plan, Profile, Workout } from './types'
 
 type Obj = Record<string, unknown>
@@ -153,6 +154,7 @@ export async function importLegacy() {
     await db.measureKinds.bulkAdd(kinds)
     await db.foods.bulkAdd(foods)
     await db.plans.bulkAdd(plans)
+    await absorbPlans(n => db.table(n))
     await db.goals.bulkAdd(goals)
     await db.exercises.bulkAdd(custom)
     await db.kv.put({ key: 'profile', value: profile })

@@ -16,7 +16,8 @@ describe('mise à jour de la base', () => {
     const { db } = await import('./db')
     const w = await db.workouts.get('w1')
     expect(w?.entries[0]).toEqual({ exerciseId: 'squat', sets: [{ weight: 60, reps: 8, type: 'drop', done: true }] })
-    const p = await db.plans.get(0)
+    const p = (await db.templates.toArray()).find(t => t.days?.includes(0))
+    expect(p?.title).toBe('Jambes')
     expect(p?.items[0].group).toBeTruthy()
     expect(p?.items[1].group).toBe(p?.items[0].group)
     const s = (await db.kv.get('session'))?.value as { entries: { sets: { type?: string }[] }[] }

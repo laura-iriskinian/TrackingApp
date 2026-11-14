@@ -1,7 +1,7 @@
-import { db } from './db'
-import type { Level, Place, Plan, PlanItem, TrainingGoal } from './types'
+import { db, newId } from './db'
+import type { Level, Place, PlanItem, Template, TrainingGoal } from './types'
 
-// Programmes tout prêts : une séance par jour d'entraînement, appliquées au planning de la semaine
+// Programmes tout prêts : quelques séances, ajoutées à la liste des séances et prévues les jours choisis
 export interface Program {
   id: string
   name: string
@@ -201,18 +201,28 @@ export function defaultDays(n: number): number[] {
   return ({ 1: [0], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 4, 5] } as Record<number, number[]>)[n] ?? [0, 2, 4]
 }
 
-export function programPlans(p: Program, days: number[]): Plan[] {
-  const now = Date.now()
-  return p.sessions.map((s, i) => ({ weekday: days[i], title: s.title, items: s.items.map(x => ({ ...x })), updatedAt: now }))
+// Séances du programme, prévues les jours choisis (dans l'ordre), ou sans jour si aucun n'est choisi
+export function programRoutines(p: Program, days: number[], newId: () => string): Template[] {
+  const now = Date.now(), sorted = [...days].sort((a, b) => a - b)
+  return p.sessions.map((s, i) => ({
+    id: newId(), title: s.title, items: s.items.map(x => ({ ...x })), ...(sorted[i] != null ? { days: [sorted[i]] } : {}), updatedAt: now,
+  }))
 }
 
-// Remplace le planning de la semaine par le programme, et règle l'objectif de séances
+// Ajoute les séances du programme à la liste et règle l'objectif de séances.
+// Une séance du même nom est remplacée. Si des jours sont choisis, les autres séances restent mais perdent leurs jours :
+// le programme prend la semaine.
 export async function applyProgram(p: Program, days: number[]) {
-  const plans = programPlans(p, [...days].sort((a, b) => a - b))
-  await db.transaction('rw', db.plans, db.kv, async () => {
-    await db.plans.clear()
-    await db.plans.bulkPut(plans)
+  const list = programRoutines(p, days, newId)
+  await db.transaction('rw', db.templates, db.kv, async () => {
+    const now = Date.now()
+    for (const t of await db.templates.toArray()) {
+      const same = list.find(x => x.title === t.title)
+      if (same) { same.id = t.id; continue }
+      if (days.length && t.days?.length) { const { days: _, ...rest } = t; await db.templates.put({ ...rest, updatedAt: now }) }
+    }
+    await db.templates.bulkPut(list)
     const row = await db.kv.get('profile')
-    await db.kv.put({ key: 'profile', value: { ...(row?.value as object | undefined), program: p.id, weeklyTarget: plans.length } })
+    await db.kv.put({ key: 'profile', value: { ...(row?.value as object | undefined), program: p.id, weeklyTarget: list.length } })
   })
 }

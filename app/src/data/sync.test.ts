@@ -59,9 +59,11 @@ describe('synchronisation', () => {
     for (const i of [1, 2, 3]) server.put({ kind: 'workouts', id: 'w' + i, data: w('w' + i, `2026-10-0${i}`, 5), updated_at: 5, deleted: false })
     server.put({ kind: 'plans', id: '2', data: { weekday: 2, title: 'Jambes', items: [], updatedAt: 5 }, updated_at: 5, deleted: false })
     const r = await sync(server)
-    expect(r).toEqual({ status: 'done', pulled: 4, pushed: 0 })
+    // L'ancien planning reçu devient une séance prévue le mercredi, renvoyée au serveur à la place du jour
+    expect(r).toEqual({ status: 'done', pulled: 4, pushed: 2 })
     expect(await db.workouts.count()).toBe(3)
-    expect((await db.plans.get(2))?.title).toBe('Jambes')
+    expect(await db.plans.count()).toBe(0)
+    expect((await db.templates.toArray())[0]).toMatchObject({ title: 'Jambes', days: [2] })
 
     server.put({ kind: 'workouts', id: 'w2', data: null, updated_at: 9, deleted: true })
     await sync(server)

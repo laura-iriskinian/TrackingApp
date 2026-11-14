@@ -7,6 +7,7 @@ import type {
 } from './types'
 import { MUSCLE_LABEL } from './exercises'
 import { convertLegacy, isLegacyExport } from './legacy'
+import { absorbPlans } from './routines'
 
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024
 const MAX_ROWS = 50000
@@ -103,7 +104,9 @@ export const ROWS = {
   },
   templates(v: Obj): Template | undefined {
     const items = planItems(v.items), title = str(v.title, 100)
-    return id(v.id) && title && items ? { id: id(v.id)!, title, items, updatedAt: time(v.updatedAt) } : undefined
+    if (!id(v.id) || !title || !items) return
+    const days = Array.isArray(v.days) ? [...new Set(v.days.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : []
+    return { id: id(v.id)!, title, items, ...(days.length ? { days } : {}), updatedAt: time(v.updatedAt) }
   },
   goals(v: Obj): Goal | undefined {
     const metric = typeof v.metric === 'string' && /^(max-weight|distance|duration|measure):[\w.:-]{1,80}$/.test(v.metric) ? v.metric : undefined
@@ -212,6 +215,7 @@ export async function restoreBackup(b: CheckedBackup) {
     await db.exercises.bulkPut(b.rows.exercises)
     await db.notes.bulkPut(b.rows.notes)
     await db.templates.bulkPut(b.rows.templates)
+    await absorbPlans(n => db.table(n)) // ancien planning par jour : converti en séances
     await db.kv.bulkPut(b.rows.kv)
     await mergeIntoCatalog(n => db.table(n))
   })

@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { allExercises, db } from '../data/db'
 import { buildEntry, lastSets } from '../data/session'
+import { sessionForDay } from '../data/routines'
 import type { Entry, Exercise, SetLog, SetType } from '../data/types'
 import { hasParts, SET_TYPES } from '../data/sets'
 import { isTimed, sideName, sideOf } from '../data/exercises'
@@ -63,7 +64,7 @@ export function WorkoutEdit({ id, date, onClose }: { id?: string; date?: string;
         ? { date: w.date, title: w.title, entries: w.entries.map(e => ({ exerciseId: e.exerciseId, group: e.group, sets: e.sets.map(toRow) })) }
         : { date: date ?? addDays(today(), -1), entries: [] }
       if (!w && date) {
-        const plan = await db.plans.get(weekday(date)), all = await allExercises()
+        const plan = sessionForDay((await db.templates.toArray()).filter(t => t.items.length), weekday(date)), all = await allExercises()
         draft.title = plan?.title || undefined
         for (const it of plan?.items ?? []) {
           const ex = all.find(e => e.id === it.exerciseId)

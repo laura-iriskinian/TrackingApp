@@ -97,6 +97,7 @@ export interface PlanItem {
   target?: string // répétitions visées, en clair : « 8-12 », « 30 s »
 }
 
+// Ancien planning, une séance par jour. Gardé pour lire les anciennes sauvegardes : il est converti en séances.
 export interface Plan {
   weekday: number // 0 = lundi
   title: string
@@ -104,11 +105,12 @@ export interface Plan {
   updatedAt: number
 }
 
-// Modèle de séance réutilisable : sert à remplir un jour du planning ou à lancer une séance
+// Séance enregistrée, à lancer quand on veut. Elle peut être prévue certains jours de la semaine (0 = lundi).
 export interface Template {
   id: string
   title: string
   items: PlanItem[]
+  days?: number[]
   updatedAt: number
 }
 

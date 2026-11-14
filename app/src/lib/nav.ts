@@ -11,7 +11,8 @@ export const openSession = () => open('#seance')
 export const openWorkoutEdit = (id?: string) => open('#seance-passee' + (id ? '/' + id : ''))
 // Séance oubliée : ajoutée à une date choisie, pré-remplie avec le planning de ce jour
 export const openWorkoutAdd = (date: string) => open('#seance-passee/date/' + date)
-export const openPlanning = () => open('#planning')
+// Liste des séances, ou une séance précise
+export const openPlanning = (id?: string) => open('#planning' + (id ? '/' + id : ''))
 export const openTimer = () => open('#chrono')
 export const openExercises = () => open('#exercices')
 export const openPrograms = () => open('#programmes')

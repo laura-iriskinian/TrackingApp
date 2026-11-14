@@ -1,11 +1,12 @@
-import type { Plan } from '../data/types'
+import type { Template } from '../data/types'
 import { addDays, weekday } from './dates'
 
 const esc = (t: string) => t.replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n')
 
 // Rappels sous forme de calendrier : un événement chaque semaine, les jours où une séance est prévue,
 // avec une alarme à l'heure choisie. Le téléphone s'en charge, même quand l'app est fermée.
-export function remindersIcs(plans: Plan[], time: string, today: string, appName = 'NextRep'): string {
+export function remindersIcs(list: Template[], time: string, today: string, appName = 'NextRep'): string {
+  const plans = list.filter(t => t.items.length).flatMap(t => (t.days ?? []).map(weekday => ({ weekday, title: t.title, items: t.items })))
   const [h, m] = time.split(':')
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//${appName}//Rappels//FR`, 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH']
   for (const p of [...plans].sort((a, b) => a.weekday - b.weekday)) {

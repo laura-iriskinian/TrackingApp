@@ -66,11 +66,11 @@ describe('récupération et régularité', () => {
     expect(streak([], 2, [], '2026-10-29').weeks).toBe(0)
   })
   it('crée un rappel par jour prévu', () => {
-    const ics = remindersIcs([{ weekday: 0, title: 'Jambes, fessiers', items: [{ exerciseId: 'squat' }], updatedAt: 0 }, { weekday: 3, title: '', items: [], updatedAt: 0 }], '18:30', '2026-10-29')
+    const ics = remindersIcs([{ id: 'a', days: [0], title: 'Jambes, fessiers', items: [{ exerciseId: 'squat' }], updatedAt: 0 }, { id: 'b', days: [3], title: 'Vide', items: [], updatedAt: 0 }, { id: 'c', title: 'Sans jour', items: [{ exerciseId: 'squat' }], updatedAt: 0 }], '18:30', '2026-10-29')
     expect(ics).toContain('DTSTART:20261102T183000')
     expect(ics).toContain('SUMMARY:Séance : Jambes\\, fessiers')
     expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(1)
-    expect(remindersIcs([{ weekday: 0, title: 'A\\B; C', items: [{ exerciseId: 'squat' }], updatedAt: 0 }], '07:00', '2026-10-29')).toContain('SUMMARY:Séance : A\\\\B\\; C')
+    expect(remindersIcs([{ id: 'a', days: [0], title: 'A\\B; C', items: [{ exerciseId: 'squat' }], updatedAt: 0 }], '07:00', '2026-10-29')).toContain('SUMMARY:Séance : A\\\\B\\; C')
   })
 })
 

@@ -9,10 +9,11 @@ import { ExerciseSheet } from './ExerciseSheet'
 import { ConfirmSheet, useToast } from './ui'
 
 
-// Détail d'un programme : séances, exercices (avec leur fiche), choix des jours, puis application au planning
+// Détail d'un programme : séances, exercices (avec leur fiche), choix des jours (facultatif), puis ajout aux séances
 export function ProgramView({ program, onApplied }: { program: Program; onApplied: () => void }) {
   const exercises = useLiveQuery(allExercises) ?? []
-  const planned = useLiveQuery(async () => (await db.plans.toArray()).filter(p => p.items.length).length)
+  // Séances déjà prévues certains jours : elles perdront leurs jours au profit du programme
+  const planned = useLiveQuery(async () => (await db.templates.toArray()).filter(t => t.days?.length && !program.sessions.some(s => s.title === t.title)).length)
   const n = program.sessions.length
   const [days, setDays] = useState(() => defaultDays(n))
   const [confirm, setConfirm] = useState(false)
@@ -25,7 +26,7 @@ export function ProgramView({ program, onApplied }: { program: Program; onApplie
   const apply = async () => {
     await applyProgram(program, days)
     setConfirm(false)
-    toast('Programme ajouté au planning')
+    toast('Séances du programme ajoutées')
     onApplied()
   }
 
@@ -59,21 +60,25 @@ export function ProgramView({ program, onApplied }: { program: Program; onApplie
 
       <section className="card">
         <h2>Tes jours</h2>
-        <p className="sub">{days.length === n ? 'Tu pourras tout changer ensuite dans le planning.' : `Choisis ${n} jours (${days.length} sur ${n}).`}</p>
+        <p className="sub">
+          {days.length === n ? 'Tu pourras tout changer ensuite dans tes séances.'
+            : days.length ? `Choisis ${n} jours (${days.length} sur ${n}), ou aucun.`
+            : 'Aucun jour fixe : tu lanceras chaque séance quand tu veux.'}
+        </p>
         <div className="chips wrap" role="group" aria-label="Jours d'entraînement">
           {DAYS.map((d, i) => (
             <button key={d} aria-pressed={days.includes(i)} onClick={() => toggle(i)}>{d}</button>
           ))}
         </div>
-        <button className="btn go" disabled={days.length !== n || planned === undefined} onClick={() => (planned ? setConfirm(true) : apply())}>
+        <button className="btn go" disabled={(days.length !== n && days.length > 0) || planned === undefined} onClick={() => (planned && days.length ? setConfirm(true) : apply())}>
           Suivre ce programme
         </button>
       </section>
 
       {confirm && (
-        <ConfirmSheet title="Remplacer ton planning ?"
-          text={`Ton planning actuel (${planned} jour${planned! > 1 ? 's' : ''} prévu${planned! > 1 ? 's' : ''}) sera remplacé par ce programme. Tes séances passées ne changent pas.`}
-          confirmLabel="Remplacer" onConfirm={apply} onClose={() => setConfirm(false)} />
+        <ConfirmSheet title="Changer tes jours ?"
+          text={`${planned! > 1 ? `Tes ${planned} séances prévues` : 'Ta séance prévue'} certains jours ${planned! > 1 ? 'resteront' : 'restera'} dans ta liste, mais sans jour fixe : le programme prend leur place dans la semaine.`}
+          confirmLabel="Continuer" onConfirm={apply} onClose={() => setConfirm(false)} />
       )}
       {info && <ExerciseSheet ex={info} onClose={() => setInfo(null)} />}
     </>

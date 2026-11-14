@@ -167,7 +167,9 @@
 .ses-item.linked { box-shadow: inset 3px 0 0 var(--effort); padding-left: 12px; }
 .ses-item.link-next + .ses-item { border-top-color: transparent; }
 
-/* Planning */
+/* Mes séances */
+.card.routine { border: 0; text-align: left; width: 100%; color: inherit; font: inherit; gap: 2px; }
+.card.routine h2 { margin: 0; }
 .days button { position: relative; padding: 9px 0; font-size: .82rem; }
 .days i { position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--effort); }
 .plan-item-head { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
@@ -265,4 +267,5 @@
 .pick.tpl .data { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pick-row .pick.tpl { min-width: 0; }
 .tpl-del { color: var(--effort); }
+.pick.best .best-tag { color: var(--effort); }
 .deload-note { color: var(--effort); }

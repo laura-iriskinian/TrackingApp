@@ -23,7 +23,9 @@ describe('catalogue élargi', () => {
     const { db } = await import('./db')
     const w = await db.workouts.get('w1')
     expect(w?.exerciseIds).toEqual(['curl-halteres', 'perso-tirage-bizarre'])
-    expect((await db.plans.get(0))?.items[0].exerciseId).toBe('curl-halteres')
+    // L'ancien planning est devenu une séance prévue le lundi
+    expect(await db.plans.count()).toBe(0)
+    expect(await db.templates.toArray()).toMatchObject([{ title: 'Bras', days: [0], items: [{ exerciseId: 'curl-halteres' }] }])
     expect((await db.goals.get('g'))?.metric).toBe('max-weight:curl-halteres')
     expect((await db.notes.get('curl-halteres'))?.text).toBe('banc incliné')
     expect(await db.notes.get('perso-curl-halteres')).toBeUndefined()

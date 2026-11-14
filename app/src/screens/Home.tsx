@@ -12,6 +12,8 @@ import { cycleWeek } from '../lib/cycle'
 import { MuscleMap } from '../components/MuscleMap'
 import { useToast } from '../components/ui'
 import { getSession, startSession } from '../data/session'
+import { sessionForDay } from '../data/routines'
+import { SessionPicker } from '../components/Templates'
 import { openPlanning, openPrograms, openSession, openWorkoutAdd, openWorkoutEdit } from '../lib/nav'
 import './Home.css'
 
@@ -19,7 +21,7 @@ export function Home() {
   const t = today()
   const profile = useLiveQuery(getProfile)
   const exercises = useLiveQuery(allExercises) ?? []
-  const plans = useLiveQuery(() => db.plans.toArray()) ?? []
+  const routines = useLiveQuery(() => db.templates.toArray()) ?? []
   const recent = useLiveQuery(() => db.workouts.where('date').aboveOrEqual(addDays(t, -62)).toArray()) ?? []
   const isEmpty = useLiveQuery(async () => (await db.workouts.count()) + (await db.measures.count()) === 0)
   const legacy = useMemo(legacySummary, [])
@@ -30,7 +32,8 @@ export function Home() {
   const sel = picked ?? t
 
   const exById = (id: string) => exercises.find(e => e.id === id)
-  const planOf = (d: string) => plans.find(p => p.weekday === weekday(d) && (p.title || p.items.length))
+  const planOf = (d: string) => sessionForDay(routines.filter(r => r.items.length), weekday(d))
+  const [choosing, setChoosing] = useState(false)
 
   const weekStart = weekStartOf(t)
   const shownStart = weekStartOf(sel)
@@ -168,19 +171,27 @@ export function Home() {
             </ol>
           )}
           {!active && <button className="btn go" onClick={() => start(plan.title || undefined)}>{sel === t ? 'Commencer la séance' : "Faire cette séance aujourd'hui"}</button>}
+          {!active && sel === t && <button className="btn soft" onClick={() => setChoosing(true)}>Choisir une autre séance</button>}
           {sel < t && <button className="btn soft" onClick={() => openWorkoutAdd(sel)}>Je l'ai faite ce jour-là</button>}
-          <button className="link plan-link" onClick={openPlanning}>Modifier le planning</button>
+          <button className="link plan-link" onClick={() => openPlanning(plan.id)}>Modifier cette séance</button>
         </section>
       ) : (
         <section className="card">
           <span className="eyebrow">{sel === t ? 'Séance du jour' : longDate(sel)}</span>
           <h2>Pas de séance prévue</h2>
-          {sel === t && <p className="sub">Profite du repos, ou entraîne-toi librement.</p>}
-          {!plans.some(p => p.items.length) && <button className="link plan-link" onClick={openPrograms}>Choisir un programme tout prêt</button>}
-          {!active && sel === t && <button className="btn soft" onClick={() => start(undefined, [])}>Commencer une séance libre</button>}
+          {sel === t && <p className="sub">Repos, ou une séance de ton choix.</p>}
+          {!active && sel === t && <button className="btn go" onClick={() => setChoosing(true)}>Commencer une séance</button>}
           {sel < t && <button className="btn soft" onClick={() => openWorkoutAdd(sel)}>Ajouter une séance à cette date</button>}
-          <button className="link plan-link" onClick={openPlanning}>Préparer le planning de la semaine</button>
+          {!routines.some(r => r.items.length) && <button className="link plan-link" onClick={openPrograms}>Choisir un programme tout prêt</button>}
+          <button className="link plan-link" onClick={() => openPlanning()}>Mes séances</button>
         </section>
+      )}
+
+      {choosing && (
+        <SessionPicker title="Quelle séance ?" onClose={() => setChoosing(false)}
+          onPick={r => { setChoosing(false); start(r.title, r.items) }}
+          onFree={() => { setChoosing(false); start(undefined, []) }}
+          onManage={() => { setChoosing(false); openPlanning() }} />
       )}
 
       <section className="card regular">

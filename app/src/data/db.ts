@@ -2,6 +2,7 @@ import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { Entry, Exercise, ExerciseNote, Food, Goal, KV, Measure, MeasureKind, Photo, Plan, Profile, Template, Workout } from './types'
 import { CATALOG, norm } from './exercises'
 import { migrateEntries, migrateItems } from './sets'
+import { absorbPlans } from './routines'
 
 export const db = new Dexie('nextrep') as Dexie & {
   workouts: EntityTable<Workout, 'id'>
@@ -49,6 +50,9 @@ db.version(4).stores({ sync: 'key' })
 // Version 5 : modèles de séances, photos de progression
 db.version(5).stores({ templates: 'id', photos: 'id, date' })
 
+// Version 6 : le planning par jour devient une liste de séances, avec des jours facultatifs
+db.version(6).stores({}).upgrade(tx => absorbPlans(n => tx.table(n)))
+
 export async function mergeIntoCatalog(table: (name: string) => Table) {
   const map = new Map<string, string>()
   for (const e of (await table('exercises').toArray()) as Exercise[]) {
@@ -60,6 +64,10 @@ export async function mergeIntoCatalog(table: (name: string) => Table) {
   const fix = (entries: Entry[]) => entries.forEach(e => { e.exerciseId = re(e.exerciseId) })
   await table('workouts').toCollection().modify((w: Workout) => { fix(w.entries); w.exerciseIds = [...new Set(w.entries.map(e => e.exerciseId))] })
   await table('plans').toCollection().modify((p: Plan) => { p.items.forEach(i => { i.exerciseId = re(i.exerciseId) }) })
+  // Les séances n'existent pas encore pendant la mise à jour d'une base très ancienne (version 3)
+  let templates: Table | undefined
+  try { templates = table('templates') } catch { templates = undefined }
+  await templates?.toCollection().modify((t: Template) => { t.items.forEach(i => { i.exerciseId = re(i.exerciseId) }) })
   await table('goals').toCollection().modify((g: Goal) => {
     const [type, id] = [g.metric.split(':')[0], g.metric.slice(g.metric.indexOf(':') + 1)]
     if (type === 'max-weight') g.metric = type + ':' + re(id)
